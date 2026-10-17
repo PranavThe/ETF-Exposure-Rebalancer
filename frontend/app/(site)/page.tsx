@@ -138,7 +138,7 @@ export default function LandingPage() {
         title="Net drift hides the real story"
         intro={
           <p>
-            In the DEMO fund, Technology ends the day exactly where it started. Underneath, prices added 5.6 pp and
+            In the DEMO fund, Technology ends the day exactly where it started. Underneath, prices added 5.6 pp and
             portfolio activity elsewhere diluted it by the same amount. {BRAND} shows both halves of every sector move.
           </p>
         }
@@ -203,8 +203,8 @@ export default function LandingPage() {
             title: "Thresholds in one config",
             body: (
               <p>
-                Event rules live in one versioned config: a 5% flow-adjusted share change and 0.1 pp of portfolio
-                activity for a position, 1.0 pp for sector drift and for concentration. Changing a rule means bumping
+                Event rules live in one versioned config: a 5% flow-adjusted share change and 0.1 pp of portfolio
+                activity for a position, 1.0 pp for sector drift and for concentration. Changing a rule means bumping
                 the version, which changes every ID.
               </p>
             ),

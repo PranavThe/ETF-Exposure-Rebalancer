@@ -110,7 +110,7 @@ export default function MethodologyPage() {
                 </li>
                 <li>
                   <Term>Differences</Term> between two weights are shown in percentage points, <Term>pp</Term>: a drift
-                  of +5.0 pp, never &ldquo;+5%&rdquo;.
+                  of +5.0 pp, never &ldquo;+5%&rdquo;.
                 </li>
                 <li>
                   A change in a share count is a ratio, not a weight, so it is shown in %: a flow-adjusted share count
@@ -236,7 +236,7 @@ flag when   r or 1/r is within 1% of 2, 3, 4, 5, 10 or 20
                 labelled <Term>dilution</Term>, never a position change.
               </p>
               <p>
-                In DEMO, AAA and DDD are unchanged, yet their portfolio activity is −3.3 pp and −2.2 pp: BBB was
+                In DEMO, AAA and DDD are unchanged, yet their portfolio activity is −3.3 pp and −2.2 pp: BBB was
                 increased, CCC removed and EEE added around them.
               </p>
             </DocSection>
@@ -256,7 +256,7 @@ activity_direct    sum over holdings that were added, removed,
 activity_dilution  sum over unchanged holdings`}</Formula>
               <p>
                 Each sector also reports <C>w0</C>, <C>wcf</C> and <C>w1</C>. In DEMO, Technology&apos;s net drift is
-                0.0 pp, but that hides +5.6 pp from price and −5.6 pp of portfolio activity, all of it dilution. The
+                0.0 pp, but that hides +5.6 pp from price and −5.6 pp of portfolio activity, all of it dilution. The
                 sector labels for ARKK are team-assigned categories, not an official classification such as GICS.
               </p>
             </DocSection>
@@ -268,7 +268,7 @@ HHI         = Σ w[i]²`}</Formula>
                 Both are computed on <C>w0</C>, <C>wcf</C> and <C>w1</C>, so a change in concentration splits into price
                 and portfolio activity like any weight. N is 10, except for DEMO, which uses 2: it has only four
                 holdings, so a top-10 share would always be 100%. In DEMO the top-2 share goes from 50.0% to 60.0%:
-                +10.0 pp (price +5.6 pp, portfolio activity +4.4 pp).
+                +10.0 pp (price +5.6 pp, portfolio activity +4.4 pp).
               </p>
             </DocSection>
 
@@ -279,11 +279,11 @@ HHI         = Σ w[i]²`}</Formula>
                   [<C key="a">POSITION_ADDED / _REMOVED</C>, "Always", "Activity effect"],
                   [
                     <C key="i">POSITION_INCREASED / _DECREASED</C>,
-                    "|flow-adjusted share change| ≥ 5% and |activity effect| ≥ 0.1 pp",
+                    "|flow-adjusted share change| ≥ 5% and |activity effect| ≥ 0.1 pp",
                     "Activity effect",
                   ],
-                  [<C key="s">SECTOR_INCREASE / _DECREASE</C>, "|drift| ≥ 1.0 pp", "Drift"],
-                  [<C key="c">CONCENTRATION_INCREASE / _DECREASE</C>, "|top-N share change| ≥ 1.0 pp", "Top-N share change"],
+                  [<C key="s">SECTOR_INCREASE / _DECREASE</C>, "|drift| ≥ 1.0 pp", "Drift"],
+                  [<C key="c">CONCENTRATION_INCREASE / _DECREASE</C>, "|top-N share change| ≥ 1.0 pp", "Top-N share change"],
                   [<C key="x">SUSPECTED_CORPORATE_ACTION</C>, "The split rule above", "Ratio r"],
                 ]}
               />

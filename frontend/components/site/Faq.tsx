@@ -37,8 +37,8 @@ const ITEMS = [
       <p>
         The price effect is how a weight would have moved if the earlier share counts had simply been carried to the
         later prices: the counterfactual. Portfolio activity is everything else, the change that comes from different
-        share counts. The two always add up to the total change. In DEMO, Health Care moved +5.0 pp: price −2.8 pp,
-        portfolio activity +7.8 pp.
+        share counts. The two always add up to the total change. In DEMO, Health Care moved +5.0 pp: price −2.8 pp,
+        portfolio activity +7.8 pp.
       </p>
     ),
   },
