@@ -17,7 +17,7 @@ export default function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-base/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 bg-base/95 backdrop-blur-md">
       <div className="flex h-16 items-center justify-between px-5 sm:px-8">
         <Link href="/" className="text-[19px] font-semibold tracking-tight text-fg" aria-label={`${BRAND} home`}>
           {BRAND}

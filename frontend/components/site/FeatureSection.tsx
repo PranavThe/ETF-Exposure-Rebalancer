@@ -41,7 +41,7 @@ export default function FeatureSection({
     <section
       id={id}
       aria-labelledby={headingId}
-      className="flex items-center px-5 py-20 sm:px-8 sm:py-28 lg:min-h-[860px] lg:px-14 lg:py-36"
+      className="flex items-center overflow-x-clip px-5 py-20 sm:px-8 sm:py-28 lg:min-h-[860px] lg:px-14 lg:py-36"
     >
       <div className={`grid w-full grid-cols-1 items-center gap-14 lg:gap-16 ${cols}`}>
         <Reveal className={`w-full max-w-[460px] ${reverse ? "lg:order-2 lg:justify-self-end" : ""}`}>

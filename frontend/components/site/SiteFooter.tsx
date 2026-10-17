@@ -7,11 +7,15 @@ import { API_DOCS, DISCLAIMER, GITHUB, LAUNCH_APP, METHODOLOGY } from "./links";
 import SiteLinkItem from "./SiteLinkItem";
 
 // Ruler ticks: dense at the edges, widest in the middle (x = sin of an even spread).
-const TICKS = Array.from({ length: 41 }, (_, i) => {
-  const t = -1 + (2 * i) / 40;
+// Minor half-height ticks only where the gap is wide enough to read.
+const TICKS = Array.from({ length: 33 }, (_, i) => {
+  const t = -1 + (2 * i) / 32;
   return 500 + 500 * Math.sin((Math.PI / 2) * t);
 }).filter((x) => x > 0.5 && x < 999.5);
-const MINOR = TICKS.slice(1).map((x, i) => (x + TICKS[i]) / 2);
+const MINOR = TICKS.slice(1)
+  .map((x, i) => ({ x: (x + TICKS[i]) / 2, gap: x - TICKS[i] }))
+  .filter((m) => m.gap > 30)
+  .map((m) => m.x);
 
 function Ruler() {
   return (
@@ -61,7 +65,7 @@ export default function SiteFooter() {
       <div className="overflow-hidden px-5 pt-20 pb-6 sm:px-8 sm:pt-28 lg:px-14">
         <p
           aria-hidden
-          className="site-fade-text pb-[0.1em] text-[clamp(56px,9.4vw,176px)] leading-[0.95] font-light tracking-[-0.045em]"
+          className="site-fade-text pb-[0.1em] text-[clamp(48px,7.6vw,150px)] leading-[0.95] font-light tracking-[-0.045em]"
         >
           Holdings, decomposed.
         </p>

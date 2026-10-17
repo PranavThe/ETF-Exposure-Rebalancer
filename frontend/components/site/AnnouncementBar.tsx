@@ -46,7 +46,7 @@ export default function AnnouncementBar() {
   }
 
   return (
-    <div role="region" aria-label="Announcement" className="relative flex min-h-10 items-center justify-center bg-panel px-12 py-2 text-center text-[13px] text-fg/85">
+    <div role="region" aria-label="Announcement" className="relative flex min-h-10 items-center justify-center bg-panel px-10 py-2 text-center text-[12px] text-fg/85 sm:px-12 sm:text-[13px]">
       <p>
         <span className="mr-2 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-up align-middle" aria-hidden />
         Now tracking ARKK daily holdings from ARK Invest
@@ -55,7 +55,7 @@ export default function AnnouncementBar() {
         type="button"
         onClick={dismiss}
         aria-label="Dismiss announcement"
-        className="absolute top-1/2 right-3 grid h-8 w-8 -translate-y-1/2 place-items-center text-faint transition-colors hover:text-fg sm:right-4"
+        className="absolute top-1/2 right-1 grid h-8 w-8 -translate-y-1/2 place-items-center text-faint transition-colors hover:text-fg sm:right-4"
       >
         <svg aria-hidden viewBox="0 0 12 12" width="11" height="11">
           <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.2" fill="none" />

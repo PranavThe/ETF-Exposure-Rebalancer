@@ -29,7 +29,7 @@ export default function TerminalWindow() {
           className="block h-auto w-full"
         />
       </div>
-      <figcaption className="label mt-4 text-center">DEMO fund · 2026-10-01 → 2026-10-02 · live terminal capture</figcaption>
+      <figcaption className="label mt-4 text-center">DEMO fund · 2026-10-01 → 2026-10-02 · terminal capture</figcaption>
     </figure>
   );
 }

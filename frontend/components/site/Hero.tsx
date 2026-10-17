@@ -29,9 +29,12 @@ export function LaunchButton() {
 
 export default function Hero() {
   return (
-    <section aria-labelledby="hero-heading" className="relative overflow-hidden bg-[#050506]">
+    <section
+      aria-labelledby="hero-heading"
+      className="relative flex min-h-[max(620px,calc(100svh-105px))] flex-col overflow-hidden bg-[#050506]"
+    >
       <HeroVisual />
-      <div className="relative flex min-h-[max(600px,calc(100svh-106px))] flex-col justify-end px-5 pt-36 pb-12 sm:px-8 sm:pb-14 lg:px-14">
+      <div className="relative flex flex-1 flex-col justify-end px-5 pt-40 pb-12 sm:px-8 sm:pb-14 lg:px-14">
         <h1
           id="hero-heading"
           className="site-gradient-text max-w-[980px] pb-[0.08em] text-[44px] leading-[1.02] font-light tracking-[-0.035em] text-balance sm:text-[64px] lg:text-[84px]"

@@ -4,7 +4,7 @@
 
 const W = 1200;
 const H = 720;
-const AXIS = 760;
+const AXIS = 600;
 
 // Small deterministic PRNG (mulberry32) so server and client render the same field.
 function rng(seed: number) {
@@ -24,11 +24,11 @@ function buildBars(): Bar[] {
   const bars: Bar[] = [];
   for (let y = 36; y < H - 30; y += 15) {
     if (r() < 0.12) continue; // a few empty rows keep it from looking like a grid
-    const h = 3 + Math.round(r() * 3);
+    const h = 2 + Math.round(r() * 3);
     // Mostly price to the right and activity to the left, with some rows reversed.
     const flip = r() < 0.28;
-    const price = 40 + r() * 330;
-    const activity = 30 + r() * 300;
+    const price = 40 + r() * 360;
+    const activity = 30 + r() * 330;
     const common = { h, dur: 9 + r() * 9, delay: -r() * 18 };
     bars.push({ ...common, y, len: price, dir: flip ? -1 : 1, kind: "price", from: 0.35 + r() * 0.3, to: 0.85 + r() * 0.15 });
     bars.push({
@@ -49,8 +49,9 @@ const BARS = buildBars();
 export default function HeroVisual() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="site-dots absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_60%_40%,#000_10%,transparent_75%)]" />
-      <div className="absolute inset-0 [mask-image:radial-gradient(ellipse_62%_68%_at_62%_40%,#000_25%,transparent_78%)]">
+      <div className="site-dots absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_62%_38%,#000_10%,transparent_75%)]" />
+      {/* On wide screens the field sits right of centre, clear of the headline. */}
+      <div className="absolute inset-0 [mask-image:radial-gradient(ellipse_58%_62%_at_50%_42%,#000_20%,transparent_80%)] lg:left-[28%]">
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
           {BARS.map((b, i) => {
             const x = b.dir === 1 ? AXIS : AXIS - b.len;
@@ -63,7 +64,7 @@ export default function HeroVisual() {
                 height={b.h}
                 rx={1}
                 fill={b.kind === "price" ? "#7a73f0" : "#c98500"}
-                fillOpacity={b.kind === "price" ? 0.42 : 0.3}
+                fillOpacity={b.kind === "price" ? 0.34 : 0.26}
                 className="site-drift"
                 style={
                   {
@@ -94,10 +95,11 @@ export default function HeroVisual() {
             ← PORTFOLIO ACTIVITY
           </text>
         </svg>
+        <div className="site-scan absolute inset-0" />
       </div>
-      <div className="site-scan absolute inset-0" />
       {/* Keep the headline corner dark. */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_top,#050506_8%,transparent_45%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_top,#050506_6%,transparent_40%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_0%_100%,rgba(5,5,6,0.92)_25%,transparent_75%)]" />
     </div>
   );
 }

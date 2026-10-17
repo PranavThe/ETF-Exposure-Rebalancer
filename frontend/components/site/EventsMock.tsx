@@ -87,7 +87,10 @@ export default function EventsMock() {
             <span className="w-9 shrink-0 text-faint">{s.side}</span>
             <span className="shrink-0 text-fg/85">{s.date}</span>
             <span className="hidden truncate sm:inline">{s.file}</span>
-            <span className="ml-auto shrink-0 text-faint">sha256 {s.hash}…</span>
+            <span className="ml-auto shrink-0 text-faint">
+              sha256 <span className="sm:hidden">{s.hash.slice(0, 8)}…</span>
+              <span className="hidden sm:inline">{s.hash}…</span>
+            </span>
           </div>
         ))}
       </figcaption>
