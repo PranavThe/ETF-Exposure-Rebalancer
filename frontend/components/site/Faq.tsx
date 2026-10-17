@@ -69,7 +69,7 @@ export default function Faq() {
     <section
       id="faq"
       aria-labelledby="faq-heading"
-      className="grid grid-cols-1 gap-12 px-5 py-24 sm:px-8 sm:py-32 lg:min-h-[760px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16 lg:px-14 lg:py-40"
+      className="grid grid-cols-1 gap-12 px-5 py-24 sm:px-8 sm:py-32 lg:min-h-[760px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16 lg:px-14 lg:py-40"
     >
       <Reveal>
         <TagPill>FAQ</TagPill>

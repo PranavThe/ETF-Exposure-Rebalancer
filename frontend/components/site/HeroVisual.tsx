@@ -22,7 +22,7 @@ type Bar = { y: number; h: number; len: number; dir: 1 | -1; kind: "price" | "ac
 function buildBars(): Bar[] {
   const r = rng(20261016);
   const bars: Bar[] = [];
-  for (let y = 36; y < H - 30; y += 15) {
+  for (let y = 52; y < H - 30; y += 15) {
     if (r() < 0.12) continue; // a few empty rows keep it from looking like a grid
     const h = 2 + Math.round(r() * 3);
     // Mostly price to the right and activity to the left, with some rows reversed.
@@ -79,23 +79,14 @@ export default function HeroVisual() {
             );
           })}
           <line x1={AXIS} y1={10} x2={AXIS} y2={H - 10} stroke="#ececf1" strokeOpacity="0.28" strokeWidth="1" className="flow-dash" />
-          <text x={AXIS + 14} y={28} className="font-mono" fontSize="11" letterSpacing="0.1em" fill="#a6a1ff" fillOpacity="0.55">
-            PRICE →
-          </text>
-          <text
-            x={AXIS - 14}
-            y={28}
-            textAnchor="end"
-            className="font-mono"
-            fontSize="11"
-            letterSpacing="0.1em"
-            fill="#c98500"
-            fillOpacity="0.6"
-          >
-            ← PORTFOLIO ACTIVITY
-          </text>
         </svg>
         <div className="site-scan absolute inset-0" />
+      </div>
+      {/* Axis labels sit outside the mask so they stay legible; the axis is the field's centre. */}
+      <div className="absolute top-6 left-1/2 grid w-[340px] -translate-x-1/2 grid-cols-[1fr_1px_1fr] items-center font-mono text-[11px] tracking-[0.1em] lg:left-[64%]">
+        <span className="pr-3 text-right text-activity/70">← PORTFOLIO ACTIVITY</span>
+        <span className="h-3 bg-fg/25" />
+        <span className="pl-3 text-accent/60">PRICE →</span>
       </div>
       {/* Keep the headline corner dark. */}
       <div className="absolute inset-0 bg-[linear-gradient(to_top,#050506_6%,transparent_40%)]" />
