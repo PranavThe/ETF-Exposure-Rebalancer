@@ -142,6 +142,9 @@ Interactive docs are at http://localhost:8000/docs.
 
 CORS allows `http://localhost:3000`. Add deployed frontend origins with a comma-separated
 `CORS_ORIGINS` environment variable, for example `CORS_ORIGINS=https://fundshift.vercel.app`.
+Origins that change per deploy, such as Vercel preview URLs, can be allowed with a
+`CORS_ORIGIN_REGEX` pattern that must match the whole origin, for example
+`CORS_ORIGIN_REGEX=https://fundshift-[a-z0-9-]+-<team>\.vercel\.app`.
 
 ## Deploy on Vercel
 
@@ -171,7 +174,10 @@ One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on
 **3. Let the frontend call the API**
 1. In the API project, add `CORS_ORIGINS=https://<frontend-domain>`. Separate several origins with
    commas, or use `*`, since the API is read-only and public.
-2. Redeploy the API.
+2. For preview deployments of the frontend, also add
+   `CORS_ORIGIN_REGEX=https://<frontend-project>-[a-z0-9-]+-<team>\.vercel\.app`, and enable
+   `NEXT_PUBLIC_API_URL` for the Preview environment in the frontend project.
+3. Redeploy the API.
 
 Make `main` the GitHub default branch so Vercel builds production from it.
 
