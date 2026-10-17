@@ -71,7 +71,7 @@ def read_series_classes(path: Path, tickers: set[str]) -> dict[str, SeriesClass]
                 continue
             record = SeriesClass(
                 ticker=ticker, series_id=series_id,
-                cik=_field(row, "CIK").lstrip("0") or "0",
+                cik=_field(row, "CIK Number", "CIK").lstrip("0") or "0",
                 series_name=_field(row, "Series Name") or ticker,
             )
             if ticker in found and found[ticker].series_id != series_id:
@@ -94,6 +94,14 @@ def _date(value: str, label: str) -> date:
     try:
         return date.fromisoformat(value[:10])
     except ValueError:
+        parts = value.upper().split("-")
+        months = {name: index for index, name in enumerate(
+            ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"), 1)}
+        if len(parts) == 3 and parts[1] in months:
+            try:
+                return date(int(parts[2]), months[parts[1]], int(parts[0]))
+            except ValueError:
+                pass
         raise ValueError(f"invalid {label} date {value!r}")
 
 
