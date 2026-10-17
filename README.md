@@ -115,6 +115,7 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 | `GET /funds/{ticker}/snapshots` | dates with `source_url, content_hash, row_count, ingested_at` |
 | `GET /funds/{ticker}/holdings?date=YYYY-MM-DD` | the stored rows with resolved sectors (the "view underlying data" link) |
 | `GET /funds/{ticker}/changes?from=&to=` | the full comparison; 404 for an unknown fund or date, 422 when `from ≥ to` |
+| `GET /etfs/search?q=IVV&limit=20` | search registered ETF symbols; includes latest data date when loaded |
 | `POST /portfolios` | create an anonymous saved portfolio; returns its edit key once |
 | `GET /portfolios/{id}` | portfolio name and allocated funds |
 | `PUT /portfolios/{id}` | replace name and fund weights; requires `X-Portfolio-Edit-Key` |
@@ -124,6 +125,10 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 Portfolio requests use fractional weights that sum to 1 when funds are present. An empty portfolio
 can be created first and allocated later. See [the portfolio API contract](docs/portfolio-api.md)
 for request examples, missing-data behavior, and the analytics handoff.
+
+To broaden ETF coverage, the data team can register U.S.-listed ETF symbols from Nasdaq and
+ingest selected SEC N-PORT or iShares holdings. See [ETF data sources](docs/etf-sources.md).
+Listing a symbol does not claim its holdings are available.
 
 Interactive docs are at http://localhost:8000/docs.
 

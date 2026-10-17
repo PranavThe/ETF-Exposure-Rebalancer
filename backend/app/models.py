@@ -22,6 +22,13 @@ class Fund(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class EtfCatalogEntry(Base):
+    __tablename__ = "etf_catalog"
+
+    ticker: Mapped[str] = mapped_column(String(16), primary_key=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Snapshot(Base):
     __tablename__ = "snapshots"
     __table_args__ = (UniqueConstraint("fund_id", "as_of_date"),)
