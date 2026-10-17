@@ -118,3 +118,17 @@ def test_event_ids_are_stable_across_calls_and_reingest(client):
     db.reset_db()
     ingest_all_samples()
     assert event_ids(client) == first
+
+
+def test_cors_origins_come_from_the_environment(monkeypatch):
+    from backend.app.main import LOCAL_ORIGINS, cors_origins
+
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    assert cors_origins() == LOCAL_ORIGINS
+    monkeypatch.setenv("CORS_ORIGINS", "https://fundshift.vercel.app/, https://example.org")
+    assert cors_origins() == LOCAL_ORIGINS + ["https://fundshift.vercel.app", "https://example.org"]
+
+
+def test_local_frontend_origin_is_allowed(client):
+    resp = client.get("/funds", headers={"Origin": "http://localhost:3000"})
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"

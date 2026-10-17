@@ -118,6 +118,9 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 
 Interactive docs are at http://localhost:8000/docs.
 
+CORS allows `http://localhost:3000`. Add deployed frontend origins with a comma-separated
+`CORS_ORIGINS` environment variable, for example `CORS_ORIGINS=https://fundshift.vercel.app`.
+
 ## Database
 
 SQLite by default (`DATABASE_URL=sqlite:///./fundshift.db`). For Postgres, set for example
