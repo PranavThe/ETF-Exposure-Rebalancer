@@ -22,7 +22,7 @@ def normalize(rows: list[Row]) -> list[Row]:
     out = []
     for r in rows:
         price = r.price
-        if price is None and r.shares and r.shares > 0:
+        if price is None and r.market_value is not None and r.shares and r.shares > 0:
             price = r.market_value / r.shares
         out.append(replace(
             r,

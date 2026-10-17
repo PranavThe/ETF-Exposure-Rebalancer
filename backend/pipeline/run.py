@@ -15,7 +15,7 @@ from .adapters import ADAPTERS, default_adapter_for
 from .adapters.base import Row, ValidationError
 from .load import load_snapshot
 from .normalize import normalize
-from .reference import read_funds, sync_reference
+from .reference import sync_reference
 from .validate import validate
 
 EXIT_CODES = {"inserted": 0, "replaced": 0, "duplicate_noop": 0, "invalid_rejected": 1,
@@ -44,9 +44,11 @@ def run_pipeline(fund: str, file: str | Path, adapter: str | None = None, replac
 
     rows: list[Row] = []
     try:
-        rows = reader.read(path)
+        rows = reader.read(path, fund=fund)
+        with Session(engine) as session:
+            known_funds = set(session.scalars(select(Fund.ticker)))
         warnings = validate(rows, file=source_file, fund=fund,
-                            known_funds={f["ticker"] for f in read_funds()}, columns=reader.columns)
+                            known_funds=known_funds, columns=reader.columns)
     except ValidationError as e:
         _log_rejection(fund, rows, source_file, str(e))
         return PipelineResult("invalid_rejected", 1, f"rejected: {e}")

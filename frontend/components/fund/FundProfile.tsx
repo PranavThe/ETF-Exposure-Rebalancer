@@ -1,6 +1,6 @@
 "use client";
 
-import { pickFund, rangeOf, useChanges, useFunds, useHoldings, useQueryState, useSnapshots } from "@/lib/hooks";
+import { pickFund, rangeOf, useChanges, useFund, useFunds, useHoldings, useQueryState, useSnapshots } from "@/lib/hooks";
 
 import Notice from "../ui/Notice";
 import CalendarPanel from "./CalendarPanel";
@@ -14,7 +14,10 @@ import StatStrip from "./StatStrip";
 export default function FundProfile() {
   const query = useQueryState();
   const funds = useFunds();
-  const fundList = funds.data ?? [];
+  const requested = query.get("fund")?.toUpperCase() ?? null;
+  const direct = useFund(requested);
+  const fundList = [...(funds.data ?? [])];
+  if (direct.data && !fundList.some((item) => item.ticker === direct.data!.ticker)) fundList.push(direct.data);
   const fund = pickFund(fundList, query.get("fund"));
   const meta = fundList.find((f) => f.ticker === fund);
 
