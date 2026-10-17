@@ -58,8 +58,12 @@ class FromTo(BaseModel):
     to: float
 
 
-class FromCfTo(FromTo):
+class FromCfTo(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_: float = Field(alias="from")
     cf: float
+    to: float
 
 
 class Summary(BaseModel):

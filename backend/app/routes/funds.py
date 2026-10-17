@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 
 from backend.analytics import config
 from backend.analytics.compare import compare_snapshots
+from backend.analytics.sectors import resolve_sector
 
 from ..db import get_session
 from ..models import Fund, Holding, SecuritySector, Snapshot
-from ..schemas import Changes
+from ..schemas import Changes, FundOut, HoldingsOut, SnapshotOut
 
 router = APIRouter(prefix="/funds")
 
@@ -47,6 +48,45 @@ def analytics_rows(holdings: list[Holding]) -> list[dict]:
     return [{"security_id": h.security_id, "ticker": h.ticker, "name": h.name,
              "asset_class": h.asset_class, "source_sector": h.source_sector, "shares": h.shares,
              "price": h.price, "market_value": h.market_value} for h in holdings]
+
+
+@router.get("", response_model=list[FundOut])
+def list_funds(session: Session = Depends(get_session)):
+    stats = (select(Snapshot.fund_id, func.count(Snapshot.id).label("n"),
+                    func.max(Snapshot.as_of_date).label("latest"))
+             .group_by(Snapshot.fund_id).subquery())
+    rows = session.execute(
+        select(Fund, stats.c.n, stats.c.latest).outerjoin(stats, stats.c.fund_id == Fund.id)
+        .order_by(Fund.ticker))
+    return [{"ticker": f.ticker, "name": f.name, "issuer": f.issuer, "snapshot_count": n or 0,
+             "latest_as_of_date": latest} for f, n, latest in rows]
+
+
+@router.get("/{ticker}/snapshots", response_model=list[SnapshotOut])
+def list_snapshots(ticker: str, session: Session = Depends(get_session)):
+    fund = fund_or_404(session, ticker)
+    snapshots = session.scalars(
+        select(Snapshot).where(Snapshot.fund_id == fund.id).order_by(Snapshot.as_of_date))
+    return [{**snapshot_meta(s), "ingested_at": s.ingested_at} for s in snapshots]
+
+
+@router.get("/{ticker}/holdings", response_model=HoldingsOut)
+def get_holdings(ticker: str, as_of: date = Query(alias="date"), session: Session = Depends(get_session)):
+    """The stored rows of one snapshot, with each row's resolved sector."""
+    fund = fund_or_404(session, ticker)
+    snapshot = snapshot_or_404(session, fund, as_of)
+    sectors = sector_map(session)
+    return {
+        "fund": fund.ticker,
+        "snapshot": {**snapshot_meta(snapshot), "ingested_at": snapshot.ingested_at},
+        "holdings": [{
+            "security_id": h.security_id, "ticker": h.ticker, "name": h.name,
+            "asset_class": h.asset_class, "source_sector": h.source_sector,
+            "sector": resolve_sector(h.security_id, h.source_sector, sectors),
+            "shares": h.shares, "price": h.price, "market_value": h.market_value,
+            "reported_weight": h.reported_weight,
+        } for h in holdings_of(session, snapshot)],
+    }
 
 
 @router.get("/{ticker}/changes", response_model=Changes)
