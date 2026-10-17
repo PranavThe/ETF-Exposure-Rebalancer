@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from backend.analytics.sectors import resolve_sector
+from backend.analytics.portfolio import analyze_latest
 
 from ..db import get_session
 from ..models import Fund, Holding, Portfolio, PortfolioFund, Snapshot, utcnow
@@ -181,3 +182,8 @@ def latest_portfolio_data(portfolio_id: str, session: Session = Depends(get_sess
         })
     return {"portfolio": portfolio_out(session, portfolio),
             "coverage_weight": coverage_weight, "funds": latest_funds}
+
+
+@router.get("/{portfolio_id}/analysis")
+def portfolio_analysis(portfolio_id: str, session: Session = Depends(get_session)):
+    return analyze_latest(latest_portfolio_data(portfolio_id, session))

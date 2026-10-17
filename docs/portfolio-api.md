@@ -65,10 +65,9 @@ never silently redistributed. The frontend should display each fund's date and a
 coverage warning when `coverage_weight < 1`. Different dates can appear in one portfolio.
 Resolved sectors use the same reference mapping as the existing fund holdings endpoint.
 
-## Analytics handoff
+## Portfolio analysis
 
-The analytics agent can consume the `funds` array from `/latest` as pure input, or the API route
-can call its pure function after integration. For each available fund, compute a holding's
+`GET /portfolios/{id}/analysis` aggregates the latest rows. For each available fund, it computes a holding's
 within-fund weight as `market_value / sum(market_value for all holdings in that fund)` (including
 cash and other asset classes). Its portfolio exposure is `fund allocation weight * within-fund
 weight`. Group holdings by `security_id` for combined exposure and overlap, and by resolved

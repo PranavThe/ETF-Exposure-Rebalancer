@@ -7,13 +7,18 @@ new file committed to data/raw.
 """
 
 import os
+import csv
 import sys
 from pathlib import Path
+
+from sqlalchemy.orm import Session
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.pipeline.run import run_pipeline  # noqa: E402
+from backend.app.db import get_engine, init_db  # noqa: E402
+from backend.pipeline.catalog import sync_etf_catalog  # noqa: E402
 
 
 def main() -> int:
@@ -33,6 +38,14 @@ def main() -> int:
             print(f"warning: {path.name}: {warning}")
         print(result.message)
         failed += result.exit_code != 0
+    if not failed:
+        catalog_path = ROOT / "data" / "reference" / "etf_catalog_2026-10-17.csv"
+        with catalog_path.open(newline="", encoding="utf-8") as source:
+            catalog = {row["ticker"]: row["name"] for row in csv.DictReader(source)}
+        init_db()
+        with Session(get_engine()) as session, session.begin():
+            inserted, updated = sync_etf_catalog(session, catalog)
+        print(f"ETF catalog: {len(catalog)} symbols, {inserted} inserted, {updated} updated")
     return 1 if failed else 0
 
 

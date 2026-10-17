@@ -10,6 +10,7 @@ import { useFunds, useHealth } from "@/lib/hooks";
 
 const LINKS = [
   { href: "/discover", label: "Discover" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/terminal", label: "Terminal" },
   { href: "/fund", label: "Fund" },
   { href: "/movers", label: "Movers" },
@@ -42,13 +43,13 @@ function FundSearch() {
           if (e.key === "Enter" && matches[0]) go(matches[0].ticker);
           if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Search funds"
-        aria-label="Search funds"
+        placeholder="Search loaded funds"
+        aria-label="Search loaded funds"
         className="h-8 w-full rounded-md border border-line bg-panel px-3 text-center text-sm text-fg placeholder:text-faint focus:border-line-2 focus:text-left focus:outline-none"
       />
       {open && matches.length > 0 && (
         <ul className="absolute inset-x-0 top-9 z-30 overflow-hidden rounded-md border border-line-2 bg-panel-2 py-1 shadow-xl">
-          {matches.map((f) => (
+          {matches.slice(0, 20).map((f) => (
             <li key={f.ticker}>
               <button
                 type="button"

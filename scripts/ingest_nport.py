@@ -28,12 +28,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--zip", type=Path, required=True, help="SEC quarterly N-PORT ZIP")
     parser.add_argument("--series-classes", type=Path, required=True, help="SEC series/class CSV")
-    parser.add_argument("--tickers", required=True, help="comma-separated ETF tickers")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--tickers", help="comma-separated ETF tickers")
+    source.add_argument("--tickers-file", type=Path, help="one ETF ticker per line; use a small batch")
     parser.add_argument("--all-dates", action="store_true", help="all public dates in this quarter")
     args = parser.parse_args(argv)
-    tickers = {ticker.strip().upper() for ticker in args.tickers.split(",") if ticker.strip()}
+    raw_tickers = (args.tickers.split(",") if args.tickers is not None
+                   else args.tickers_file.read_text(encoding="utf-8").splitlines())
+    tickers = {ticker.strip().upper() for ticker in raw_tickers if ticker.strip()}
     if not tickers:
-        parser.error("--tickers must include at least one symbol")
+        parser.error("provide at least one symbol")
 
     init_db()
     with Session(get_engine()) as session:

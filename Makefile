@@ -33,6 +33,5 @@ web:
 
 demo:
 	$(PY) -c "from backend.app.db import reset_db; reset_db()"
-	$(MAKE) ingest-sample
-	$(MAKE) ingest-raw
+	$(PY) scripts/seed_db.py
 	$(MAKE) api

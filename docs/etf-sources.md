@@ -14,8 +14,9 @@ ingested. This makes a broad selection UI possible without claiming unsupported 
 | iShares latest holdings CSV | Fresher holdings, values, weights, and issuer sectors for supported iShares funds | [example product page](https://www.ishares.com/us/products/239726/ishares-core-sp-500-etfUSdollars) |
 | ARK issuer CSV | Existing ARKK adapter | [existing source URL](https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv) |
 
-All three new jobs are **offline data operations**. They are not called from a user request or
-automatically on a Vercel build. Set `DATABASE_URL` to the intended database before running them.
+The dated Nasdaq catalog CSV in `data/reference` is loaded by `scripts/seed_db.py` during an API
+build. SEC and issuer holdings remain **offline data operations**. Set `DATABASE_URL` to the
+intended database before running them.
 Without it, they use the local SQLite database. Do not point them at Neon until the team is ready
 to populate the shared database. The SEC source downloads are large and are ignored by Git.
 
@@ -29,6 +30,9 @@ This reads Nasdaq's `nasdaqlisted.txt` and `otherlisted.txt`, keeps rows marked 
 `Test Issue=N`, and upserts tickers into `funds` plus `etf_catalog`. `GET /etfs/search?q=...`
 returns up to 100 matching entries. Existing curated fund names and issuers are preserved. The
 catalog may contain ETFs that N-PORT does not cover (for example, some commodity trusts).
+The committed catalog snapshot has 5,787 symbols as of 2026-10-17; refresh it deliberately as
+listings change. The existing Discover view requests only 24 funds with loaded snapshots, while
+the portfolio picker searches the full catalog.
 
 ### 2. Ingest SEC history for selected ETFs
 
@@ -41,7 +45,7 @@ python scripts/download_sec_data.py --quarter 2026q3 --series-year 2026
 python scripts/ingest_nport.py \
   --zip data/vendor/sec/2026q3_nport.zip \
   --series-classes data/vendor/sec/investment-company-series-class-2026.csv \
-  --tickers SPY,VOO,VTI,QQQ,TLT
+  --tickers VOO,VTI,QQQ,TLT
 ```
 
 `--all-dates` ingests each publicly available report date in that ZIP; the default ingests the
@@ -56,6 +60,14 @@ If automated SEC downloads return HTTP 403, download the two files from the link
 a normal browser and place them at the paths above. The importer accepts those local files.
 The SEC series/class report can lag new ETF listings; such tickers remain searchable with no SEC
 mapping until another source is available.
+
+To plan broader coverage from downloaded files, run `scripts/plan_nport_coverage.py` with the
+same `--zip` and `--series-classes` inputs plus `--output data/vendor/sec/eligible_2026q3.txt`.
+For these 2026 Q3 files, 4,200 catalog symbols have a unique series mapping and a public report;
+41 have ambiguous mappings and are excluded. Split the eligible list into manageable batches
+and pass each batch to `ingest_nport.py --tickers-file <path>`. The plan does not write to the
+database. Verify `DATABASE_URL` before importing into Neon; the checked-out branch currently
+does not include a Neon connection or Vercel project link.
 
 ### 3. Add fresher iShares snapshots
 
