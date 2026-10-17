@@ -4,8 +4,8 @@ from typing import Iterable
 
 
 def top_n_share(weights: Iterable[float], n: int) -> float:
-    raise NotImplementedError
+    return sum(sorted(weights, reverse=True)[:n])
 
 
 def hhi(weights: Iterable[float]) -> float:
-    raise NotImplementedError
+    return sum(w * w for w in weights)
