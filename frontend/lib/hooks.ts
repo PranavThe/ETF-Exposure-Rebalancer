@@ -118,7 +118,8 @@ export function useQueryState() {
   return {
     get: (key: string) => params.get(key) ?? undefined,
     set(updates: Record<string, string | undefined>) {
-      const next = new URLSearchParams(params.toString());
+      // Start from the live URL, not this render's params, so back-to-back updates both apply.
+      const next = new URLSearchParams(window.location.search);
       for (const [key, value] of Object.entries(updates)) {
         if (value) next.set(key, value);
         else next.delete(key);
