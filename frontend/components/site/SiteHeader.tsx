@@ -22,7 +22,7 @@ export default function SiteHeader() {
           underneath stay hidden; it redraws the frame's 1px side lines where it covers them. */}
       <div
         aria-hidden
-        className="absolute inset-y-0 -inset-x-[6px] -z-10 bg-[linear-gradient(to_right,var(--color-base)_5px,var(--color-line)_5px,var(--color-line)_6px,var(--color-base)_6px,var(--color-base)_calc(100%_-_6px),var(--color-line)_calc(100%_-_6px),var(--color-line)_calc(100%_-_5px),var(--color-base)_calc(100%_-_5px))]"
+        className="absolute inset-y-0 -inset-x-[6px] -z-10 bg-[linear-gradient(to_right,var(--color-canvas)_5px,var(--color-line)_5px,var(--color-line)_6px,var(--color-canvas)_6px,var(--color-canvas)_calc(100%_-_6px),var(--color-line)_calc(100%_-_6px),var(--color-line)_calc(100%_-_5px),var(--color-canvas)_calc(100%_-_5px))]"
       />
       <div className="flex h-16 items-center justify-between px-5 sm:px-8">
         <Link href="/" className="text-[19px] font-semibold tracking-tight text-fg" aria-label={`${BRAND} home`}>

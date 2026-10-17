@@ -78,7 +78,7 @@ export default function AppNav() {
   const online = health.data?.status === "ok";
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-base px-3 sm:gap-4 sm:px-4">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-canvas px-3 sm:gap-4 sm:px-4">
       <Link href="/" className="shrink-0 text-base font-semibold tracking-tight text-fg sm:text-[19px]">
         {BRAND}
       </Link>

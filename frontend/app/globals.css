@@ -7,7 +7,7 @@
 
 @theme {
   --color-page: #08080a;
-  --color-base: #0b0b0d;
+  --color-canvas: #0b0b0d;
   --color-panel: #121215;
   --color-panel-2: #18181c;
   --color-panel-3: #1f1f24;
@@ -30,7 +30,7 @@
 }
 
 body {
-  background: var(--color-base);
+  background: var(--color-canvas);
   color: var(--color-fg);
 }
 

@@ -77,7 +77,7 @@ export default function EventsMock() {
         ))}
       </ul>
 
-      <figcaption className="space-y-1.5 bg-base/40 px-3 py-3 sm:px-4">
+      <figcaption className="space-y-1.5 bg-canvas/40 px-3 py-3 sm:px-4">
         <div className="label">Source data · contributing holdings: BBB</div>
         {SOURCES.map((s) => (
           <div

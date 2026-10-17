@@ -9,7 +9,7 @@ import "@/components/site/site.css";
 // The app's nav and status bar live in app/(app)/layout.tsx and are not used here.
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-base">
+    <div className="min-h-dvh bg-canvas">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-white focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:text-black"

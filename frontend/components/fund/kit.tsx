@@ -210,7 +210,7 @@ export function Avatar({
       </span>
       {badge && (
         <span
-          className="absolute -right-1 -bottom-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-base bg-panel-3 px-1 font-mono text-[9px] leading-none font-semibold"
+          className="absolute -right-1 -bottom-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-canvas bg-panel-3 px-1 font-mono text-[9px] leading-none font-semibold"
           style={{ color: a }}
           title={badge}
         >
