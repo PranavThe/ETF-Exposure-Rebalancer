@@ -5,11 +5,15 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Pie,
+  PieChart,
   ReferenceLine,
   ResponsiveContainer,
+  Sector,
   Tooltip,
   XAxis,
   YAxis,
+  type PieSectorShapeProps,
 } from "recharts";
 
 import type { SectorChange } from "@/lib/api";
@@ -19,8 +23,24 @@ import { pct, pp } from "@/lib/format";
 const PRICE_COLOR = "#2a78d6";
 const ACTIVITY_COLOR = "#eb6834";
 const SURFACE = "#ffffff";
+const SECTOR_COLORS = [
+  "#2563a6", "#d75a3a", "#2b8a6e", "#8a55a2", "#b87818", "#3d7f91",
+  "#a74366", "#6e7e28", "#7162b4", "#ba6e51", "#4d8390", "#8d6c28",
+];
 
 type Datum = { sector: string; price: number; activity: number; change: SectorChange };
+type PieDatum = { sector: string; weight: number };
+
+function PieSlice(props: PieSectorShapeProps) {
+  return (
+    <Sector
+      {...props}
+      fill={SECTOR_COLORS[props.index % SECTOR_COLORS.length]}
+      stroke={SURFACE}
+      strokeWidth={2}
+    />
+  );
+}
 
 // Two-line axis label: the sector name, then its net drift.
 function SectorTick({
@@ -68,6 +88,9 @@ function SectorTooltip({ active, payload }: { active?: boolean; payload?: { payl
 }
 
 export default function SectorChart({ sectors }: { sectors: SectorChange[] }) {
+  const pieData: PieDatum[] = sectors
+    .filter((s) => s.w_to > 0)
+    .map((s) => ({ sector: s.sector, weight: s.w_to }));
   const data: Datum[] = sectors.map((s) => ({
     sector: s.sector,
     price: s.price_effect * 100,
@@ -78,7 +101,45 @@ export default function SectorChart({ sectors }: { sectors: SectorChange[] }) {
 
   return (
     <section className="min-w-0 rounded border border-zinc-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Sector exposure change</h2>
+      <h2 className="text-base font-semibold">Sector exposure</h2>
+      <p className="text-sm text-zinc-600">The pie shows the later snapshot&apos;s equity mix.</p>
+      {pieData.length > 0 ? (
+        <div className="my-4 flex flex-col items-center gap-3 rounded bg-zinc-50 p-3 sm:flex-row">
+          <div className="h-64 w-full max-w-72 shrink-0" role="img" aria-label="Sector exposure pie chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="weight"
+                  nameKey="sector"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius="82%"
+                  shape={PieSlice}
+                  isAnimationActive={false}
+                />
+                <Tooltip formatter={(value) => pct(Number(value))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="w-full min-w-0 space-y-1.5 text-sm" aria-label="Sector exposure percentages">
+            {pieData.map((item, index) => (
+              <li key={item.sector} className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0 rounded-sm"
+                  style={{ backgroundColor: SECTOR_COLORS[index % SECTOR_COLORS.length] }}
+                />
+                <span className="min-w-0 flex-1 truncate" title={item.sector}>{item.sector}</span>
+                <span className="font-medium tabular-nums">{pct(item.weight)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="my-4 text-sm text-zinc-500">No equity sector exposure in the later snapshot.</p>
+      )}
+      <h3 className="text-sm font-semibold">Exposure change</h3>
       <p className="mb-2 text-sm text-zinc-600">
         Each bar splits a sector&apos;s weight change into price movement and portfolio activity. The
         axis label shows the net drift.
