@@ -25,16 +25,38 @@ make web      # second terminal: frontend on http://localhost:3000
 
 ### Demo walkthrough
 
-1. `make demo`, `make web`, then open http://localhost:3000. Pick **DEMO**, from 2026-10-01 to 2026-10-02.
-2. Technology's net drift is 0.0 pp, but the sector table shows it hides +5.6 pp from price and
-   −5.6 pp from dilution. Health Care is +5.0 pp, driven by an increased BBB position. CCC was
-   removed and EEE was added.
-3. Click an event. Its contributing holdings are highlighted in the table, and **Source data** shows
-   both snapshots' files and content hashes, with links to the raw `/holdings` JSON.
+1. `make demo`, `make web`, then open http://localhost:3000 (the landing page) and click **Launch app**,
+   or go straight to http://localhost:3000/terminal. In the terminal sidebar pick **DEMO**, from
+   2026-10-01 to 2026-10-02.
+2. Technology's net drift is 0.0 pp, but the **Sectors** chart and tab show it hides +5.6 pp from
+   price and −5.6 pp from dilution. Health Care is +5.0 pp, driven by an increased BBB position. CCC
+   was removed and EEE was added.
+3. Click an event. Its contributing holdings are highlighted in the **Holdings** tab, the
+   **Inspector** explains it, and the **Source** tab shows both snapshots' files and content hashes,
+   with links to the raw `/holdings` JSON.
 4. Re-run `make ingest-sample`. It prints `already ingested`, and the event IDs are unchanged.
 5. **SPLT**: FFF's share count doubled, but it is flagged as a suspected split, not an increased position.
 6. **FLOW**: every share count rose 10%. There are no events, because that was fund flow.
-7. **ARKK**: real issuer data (see below). It needs two snapshots before a comparison is possible.
+7. **ARKK**: real issuer data (see below). It needs two snapshots before a comparison is possible;
+   its holdings are on the **Fund** page.
+
+## Frontend
+
+A dark, terminal-style Next.js app (layout modelled on the Kairos terminal) plus a marketing site in
+the same project:
+
+| Route | What it shows |
+|---|---|
+| `/` | Landing page: what the product does, with the real DEMO numbers and a product screenshot |
+| `/methodology` | Every formula, rule and threshold behind the numbers |
+| `/discover` | All funds: featured comparison, latest events, largest weight changes, fund cards |
+| `/terminal` | The analysis desk: sector chart, events, inspector, holdings, sources and caveats |
+| `/fund` | One fund: snapshot calendar (pick two days to compare), sources, holdings at a date |
+| `/movers` | Positions ranked by portfolio activity across funds |
+
+Views keep their selection in the URL (`/terminal?fund=DEMO&from=2026-10-01&to=2026-10-02`), so
+every view can be shared as a link. The product name lives in `frontend/lib/brand.ts`. Geist and
+Geist Mono are bundled in `frontend/app/fonts` (SIL Open Font License), so builds need no network.
 
 ## How the numbers work
 
@@ -181,7 +203,7 @@ backend/app/        FastAPI app, SQLAlchemy models, response schemas, routes
 backend/pipeline/   adapters (sample, ark), validate, normalize, load, reference data
 backend/analytics/  pure functions: weights, decompose, sectors, concentration, events, compare
 backend/tests/      golden values from SPEC §10, pipeline and API tests
-frontend/           Next.js + Tailwind + Recharts single page
+frontend/           Next.js + Tailwind + Recharts: marketing site and the terminal app (see Frontend)
 data/sample/        synthetic fixtures (DEMO, SPLT, FLOW)
 data/raw/           real issuer files
 data/reference/     funds.csv, sectors.csv
