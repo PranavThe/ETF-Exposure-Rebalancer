@@ -271,3 +271,37 @@ def test_failure_mid_load_leaves_nothing_behind(db_url, monkeypatch):
     assert len(calls) == 3
     assert snapshot_count(as_of=date(2026, 10, 1)) == 0
     assert holding_count() == 0
+
+
+# --- Real ARK file (data/raw, committed; no network) ---
+
+ARKK_FILE = SAMPLE_DIR.parent / "raw" / "ARKK_2026-10-16.csv"
+
+
+def test_ark_adapter_reads_the_issuer_format():
+    from backend.pipeline.adapters.ark import ArkAdapter
+
+    rows = ArkAdapter().read(ARKK_FILE)
+    assert len(rows) == 46  # the disclaimer footer is skipped
+    assert {r.as_of_date for r in rows} == {date(2026, 10, 16)}
+    tsla = rows[0]
+    assert (tsla.security_id, tsla.ticker, tsla.shares) == ("88160R101", "TSLA", 2065670)
+    assert tsla.market_value == 748681434.80
+    assert close(tsla.reported_weight, 0.0976)  # percent in the file, fraction here
+    classes = {r.security_id: r.asset_class for r in rows}
+    assert classes["X9USDGSFT"] == "cash"  # money-market fund
+    assert classes["BREADUMMY"] == "other"  # warrants
+    assert classes["PPOPENAIC"] == "equity"  # private placement without a ticker
+
+
+def test_real_ark_file_ingests_and_reingest_is_a_noop(db_url, capsys):
+    assert ingest(ARKK_FILE, "ARKK") == 0
+    assert ingest(ARKK_FILE, "ARKK") == 0
+    assert "already ingested" in output(capsys)
+    assert snapshot_count("ARKK") == 1
+    assert holding_count() == 46
+    with Session(db.get_engine()) as s:
+        snapshot = s.scalars(select(Snapshot)).one()
+        assert snapshot.source_url.startswith("https://assets.ark-funds.com/")
+        tsla = s.scalars(select(Holding).where(Holding.security_id == "88160R101")).one()
+        assert close(tsla.price, 748681434.80 / 2065670)  # derived: the file has no price column

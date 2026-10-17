@@ -1,6 +1,6 @@
 PY := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: setup test ingest-sample api web demo
+.PHONY: setup test ingest-sample ingest-raw api web demo
 
 setup:
 	python3 -m venv .venv
@@ -17,6 +17,14 @@ ingest-sample:
 		$(PY) scripts/run_pipeline.py --fund $$fund --file $$f --adapter sample || exit 1; \
 	done
 
+# Real issuer files saved by scripts/fetch_holdings.py: ARKK_2026-10-16.csv -> ARKK.
+ingest-raw:
+	@for f in data/raw/*.csv; do \
+		[ -e "$$f" ] || continue; \
+		fund=$$(basename $$f | cut -d_ -f1 | tr a-z A-Z); \
+		$(PY) scripts/run_pipeline.py --fund $$fund --file $$f || exit 1; \
+	done
+
 api:
 	$(PY) -m uvicorn backend.app.main:app --port 8000
 
@@ -26,4 +34,5 @@ web:
 demo:
 	$(PY) -c "from backend.app.db import reset_db; reset_db()"
 	$(MAKE) ingest-sample
+	$(MAKE) ingest-raw
 	$(MAKE) api

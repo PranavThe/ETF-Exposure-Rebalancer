@@ -7,8 +7,10 @@ if one looks wrong, stop and show the arithmetic.
 - `make setup`: create `.venv`, install `requirements.txt`, `npm install` in `frontend/`
 - `make test`: run pytest (`backend/tests`)
 - `make ingest-sample`: ingest every `data/sample/*.csv` (rerunning prints `already ingested`)
+- `make ingest-raw`: ingest every real issuer file in `data/raw/` (`make demo` runs both)
 - `make api`: run the FastAPI app on :8000. `make web`: run Next.js dev server on :3000
-- `make demo`: reset DB, ingest the samples, start the API
+- `make demo`: reset DB, ingest samples and raw files, start the API
+- Frontend: `frontend/` (Next.js 16; see `frontend/AGENTS.md`). Check with `npm run build` and `npm run lint`.
 - One file: `.venv/bin/python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.csv [--adapter sample|ark] [--replace]`
 - DB: `DATABASE_URL` (default `sqlite:///./fundshift.db`). Tables come from `metadata.create_all`, no Alembic.
 
@@ -24,6 +26,7 @@ if one looks wrong, stop and show the arithmetic.
 - Ask before you change units or the decomposition math, add a service, DB, queue or scheduler,
   or add a dependency not listed in SPEC §3.
 - Thresholds, `TOP_N` and `CONFIG_VERSION` live in `backend/analytics/config.py`.
+  DEMO uses top-2 (`TOP_N_BY_FUND`), as SPEC §10 requires; other funds use 10.
 
 ## Language rules (UI copy and event descriptions, SPEC §9)
 - Never say "bought", "sold", "trade", or what the manager "believes" or "thinks".
@@ -31,6 +34,7 @@ if one looks wrong, stop and show the arithmetic.
   An increased position always means a flow-adjusted share-count change.
 - Weight differences are "pp", never "%". Every drift shows its price/activity split.
 - Template: `Health Care exposure +5.0 pp (price −2.8 pp, portfolio activity +7.8 pp)`
+- These rules cover caveat strings too (they appear in the UI).
 - Footer on every page: "Derived from issuer-published holdings snapshots. Not investment advice."
 
 ## ARKK source file (observed 2026-10-17, saved as data/raw/ARKK_2026-10-16.csv)
