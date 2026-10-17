@@ -59,7 +59,7 @@ export default function FundProfile() {
   return (
     <div className="relative isolate min-h-full">
       <ArcLines />
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 py-5 md:px-6 md:py-6">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 pt-5 pb-12 md:px-6 md:pt-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">Fund profile</h1>
           {fundList.length > 0 && (

@@ -40,24 +40,29 @@ function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
   const max = Math.max(0, ...rows.map((h) => h.reported_weight ?? 0));
   return (
     <div className="max-h-[560px] overflow-auto">
-      <table className="w-full min-w-[820px] text-sm">
+      <table className="w-full text-sm md:min-w-[820px]">
         <thead>
           <tr className="border-b border-line">
             <Th className="pl-4">Security</Th>
-            <Th>Sector</Th>
-            <Th>Asset class</Th>
-            <Th right>Shares</Th>
-            <Th right>Price</Th>
+            <Th className="hidden md:table-cell">Sector</Th>
+            <Th className="hidden md:table-cell">Asset class</Th>
+            <Th right className="hidden md:table-cell">
+              Shares
+            </Th>
+            <Th right className="hidden md:table-cell">
+              Price
+            </Th>
             <Th right>Market value</Th>
             <Th right className="pr-4">
-              Reported weight
+              <span className="md:hidden">Weight</span>
+              <span className="hidden md:inline">Reported weight</span>
             </Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((h) => (
             <tr key={h.security_id} className="border-b border-line/60 hover:bg-panel-2">
-              <td className="max-w-[300px] py-2.5 pr-3 pl-4">
+              <td className="max-w-[160px] py-2.5 pr-3 pl-4 md:max-w-[300px]">
                 <div className="truncate font-semibold">
                   {h.ticker || <span className="font-mono text-[13px] font-normal text-muted">{h.security_id}</span>}
                 </div>
@@ -65,7 +70,7 @@ function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
                   {h.name}
                 </div>
               </td>
-              <td className="px-3 py-2.5 whitespace-nowrap text-muted">
+              <td className="hidden px-3 py-2.5 whitespace-nowrap text-muted md:table-cell">
                 {h.sector}
                 {h.source_sector && h.source_sector !== h.sector && (
                   <span className="ml-1 text-[11px] text-faint" title="Sector as published by the issuer">
@@ -73,13 +78,15 @@ function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
                   </span>
                 )}
               </td>
-              <td className="px-3 py-2.5">
+              <td className="hidden px-3 py-2.5 md:table-cell">
                 <span className={`rounded px-1.5 py-0.5 text-[11px] capitalize ${ASSET_CLASS[h.asset_class] ?? ASSET_CLASS.equity}`}>
                   {h.asset_class}
                 </span>
               </td>
-              <td className="px-3 py-2.5 text-right font-mono text-[13px] tabular-nums">{shares(h.shares)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-[13px] text-muted tabular-nums">{usd(h.price)}</td>
+              <td className="hidden px-3 py-2.5 text-right font-mono text-[13px] tabular-nums md:table-cell">{shares(h.shares)}</td>
+              <td className="hidden px-3 py-2.5 text-right font-mono text-[13px] text-muted tabular-nums md:table-cell">
+                {usd(h.price)}
+              </td>
               <td className="px-3 py-2.5 text-right font-mono text-[13px] tabular-nums">{money(h.market_value)}</td>
               <td className="py-2.5 pr-4 pl-3 text-right font-mono text-[13px] tabular-nums">
                 <WeightCell value={h.reported_weight} max={max} />
@@ -106,14 +113,16 @@ function SectorsTable({ rows }: { rows: HoldingRow[] }) {
   const total = sectors.reduce((sum, [, s]) => sum + s.weight, 0);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-sm">
+      <table className="w-full text-sm sm:min-w-[560px]">
         <thead>
           <tr className="border-b border-line">
             <Th className="pl-4">Sector</Th>
             <Th right>Rows</Th>
-            <Th right>Market value</Th>
-            <Th right>Reported weight</Th>
-            <Th className="w-[38%] pr-4">
+            <Th right className="hidden sm:table-cell">
+              Market value
+            </Th>
+            <Th right>Weight</Th>
+            <Th className="w-[30%] pr-4 sm:w-[38%]">
               <span className="sr-only">Bar</span>
             </Th>
           </tr>
@@ -123,7 +132,9 @@ function SectorsTable({ rows }: { rows: HoldingRow[] }) {
             <tr key={name} className="border-b border-line/60 hover:bg-panel-2">
               <td className="py-2.5 pr-3 pl-4">{name}</td>
               <td className="px-3 py-2.5 text-right font-mono text-[13px] text-muted tabular-nums">{s.count}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-[13px] text-muted tabular-nums">{money(s.value)}</td>
+              <td className="hidden px-3 py-2.5 text-right font-mono text-[13px] text-muted tabular-nums sm:table-cell">
+                {money(s.value)}
+              </td>
               <td className="px-3 py-2.5 text-right font-mono text-[13px] tabular-nums">{pct(s.weight)}</td>
               <td className="py-2.5 pr-4 pl-3">
                 <div className="h-1.5 overflow-hidden rounded-full bg-panel-3">
@@ -135,7 +146,10 @@ function SectorsTable({ rows }: { rows: HoldingRow[] }) {
         </tbody>
         <tfoot>
           <tr>
-            <td className="py-2.5 pr-3 pl-4 text-xs text-faint" colSpan={3}>
+            <td className="py-2.5 pr-3 pl-4 text-xs text-faint sm:hidden" colSpan={2}>
+              Reported weights by sector, cash and other included.
+            </td>
+            <td className="hidden py-2.5 pr-3 pl-4 text-xs text-faint sm:table-cell" colSpan={3}>
               Reported weights summed by resolved sector, cash and other rows included.
             </td>
             <td className="px-3 py-2.5 text-right font-mono text-[13px] text-muted tabular-nums">{pct(total)}</td>

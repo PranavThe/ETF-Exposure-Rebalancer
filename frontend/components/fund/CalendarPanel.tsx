@@ -229,7 +229,7 @@ export default function CalendarPanel({
           </div>
 
           <div className="mt-auto flex flex-col gap-2 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3 text-[11px] text-faint">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] whitespace-nowrap text-faint">
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-sm border border-accent/50 bg-accent/10" /> Snapshot
               </span>

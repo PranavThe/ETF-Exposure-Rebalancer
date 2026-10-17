@@ -83,8 +83,8 @@ export default function StatStrip({
   return (
     <div className="flex flex-col gap-3 xl:flex-row">
       <section className="min-w-0 flex-1 overflow-hidden rounded-md border border-line bg-panel">
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:divide-x xl:divide-line">
-          <div className="col-span-2 flex min-w-0 items-center gap-3 border-b border-line px-4 py-3 sm:col-span-3 xl:w-[300px] xl:shrink-0 xl:border-b-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 xl:flex xl:divide-x xl:divide-line">
+          <div className="col-span-2 flex min-w-0 items-center gap-3 border-b border-line px-4 py-3 sm:col-span-3 lg:col-span-6 xl:w-[300px] xl:shrink-0 xl:border-b-0">
             <Avatar seed={fund.ticker} text={fund.ticker.slice(0, 2)} size={36} />
             <div className="min-w-0">
               <div className="flex items-center gap-1">

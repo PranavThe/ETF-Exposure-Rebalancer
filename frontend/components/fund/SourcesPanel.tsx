@@ -72,10 +72,12 @@ export default function SourcesPanel({ fund, snapshots }: { fund: string; snapsh
           </li>
         ))}
       </ul>
-      <p className="relative mt-auto flex min-h-28 flex-1 flex-col justify-end px-4 py-3 text-right text-[11px] leading-relaxed text-faint">
-        <span>Hash: SHA-256 of the normalized rows.</span>
-        <span>Re-ingesting the same content is a no-op.</span>
-      </p>
+      {snapshots && (
+        <p className="relative bg-panel px-4 py-3 text-[11px] leading-relaxed text-faint">
+          Hash: SHA-256 of the normalized rows. Re-ingesting the same content is a no-op.
+        </p>
+      )}
+      <div aria-hidden className="min-h-32 flex-1" />
     </Card>
   );
 }

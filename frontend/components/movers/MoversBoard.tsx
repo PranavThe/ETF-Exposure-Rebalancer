@@ -15,7 +15,7 @@ type Mover = { fund: string; from: string; to: string; change: HoldingChange; ra
 
 // Column templates: mobile shows rank, security and activity; md adds fund and weight; lg shows all.
 const GRID =
-  "grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[2.5rem_minmax(0,1fr)_4.5rem_8.5rem_minmax(0,12.5rem)] lg:grid-cols-[2.5rem_minmax(0,1fr)_5.5rem_9.5rem_10rem_minmax(0,13.5rem)_7.5rem]";
+  "grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[2.5rem_minmax(0,1fr)_6rem_9.75rem_minmax(0,12.5rem)] lg:grid-cols-[2.5rem_minmax(0,1fr)_6rem_9.5rem_10rem_minmax(0,13.5rem)_7.5rem]";
 
 function Header() {
   return (
@@ -24,7 +24,7 @@ function Header() {
       <span className="label">Security</span>
       <span className="label hidden md:block">Fund</span>
       <span className="label hidden lg:block">Status</span>
-      <span className="label text-right text-fg">↓ Portfolio activity</span>
+      <span className="label text-right whitespace-nowrap text-fg">↓ Portfolio activity</span>
       <span className="label hidden text-right md:block">Weight</span>
       <span className="label hidden text-right lg:block">Flow-adj. shares</span>
     </div>
@@ -207,8 +207,8 @@ export default function MoversBoard() {
       >
         <p>
           {range === "latest"
-            ? "Between the two most recent snapshots, every flow-adjusted share count stayed the same. Weights may still have moved with prices."
-            : "Every flow-adjusted share count stayed the same. Weights may still have moved with prices or fund flows."}
+            ? `Between ${selected ? `${selected.ticker}'s` : "each fund's"} two most recent snapshots, no flow-adjusted share count changed enough to count as portfolio activity. Weights may still have moved with prices.`
+            : "No flow-adjusted share count changed enough to count as portfolio activity. Weights may still have moved with prices; suspected splits are flagged, not counted."}
         </p>
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           {range === "latest" && (
@@ -246,7 +246,7 @@ export default function MoversBoard() {
   return (
     <div className="relative isolate min-h-full">
       <ArcLines />
-      <div className="mx-auto flex max-w-[1240px] flex-col gap-5 px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-5 px-4 pt-6 pb-12 md:px-6 md:pt-8">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-[28px] leading-tight font-bold tracking-tight">Movers</h1>
