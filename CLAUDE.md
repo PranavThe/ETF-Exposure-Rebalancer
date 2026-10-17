@@ -12,6 +12,9 @@ if one looks wrong, stop and show the arithmetic.
 - `make api`: run the FastAPI app on :8000. `make web`: run Next.js dev server on :3000
 - `make demo`: reset DB, ingest samples and raw files, start the API
 - Frontend: `frontend/` (Next.js 16; see `frontend/AGENTS.md`). Check with `npm run build` and `npm run lint`.
+  Site pages in `app/(site)`, app pages in `app/(app)`. Product name: `lib/brand.ts` (`BRAND`), never hard-coded.
+  Data via `lib/hooks.ts` (cached); URL state via `useQueryState` (needs `<Suspense>`). Theme tokens in
+  `app/globals.css`; don't name a colour token after a Tailwind size (`base`, `sm`, ...).
 - One file: `.venv/bin/python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.csv [--adapter sample|ark] [--replace]`
 - DB: `DATABASE_URL` (default `sqlite:///./fundshift.db`; `postgres://` maps to psycopg 3). No Alembic.
 - Deploy: two Vercel projects from this repo (API at `./` via `index.py` + `vercel.json`, whose build

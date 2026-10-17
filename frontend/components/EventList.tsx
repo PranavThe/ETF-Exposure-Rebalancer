@@ -1,16 +1,11 @@
 import type { ChangeEvent } from "@/lib/api";
+import { pp } from "@/lib/format";
+import { EVENT_TYPES, tone } from "@/lib/labels";
 
-const TYPE_LABELS: Record<string, string> = {
-  POSITION_ADDED: "Position added",
-  POSITION_REMOVED: "Position removed",
-  POSITION_INCREASED: "Increased position",
-  POSITION_DECREASED: "Decreased position",
-  SECTOR_INCREASE: "Sector exposure up",
-  SECTOR_DECREASE: "Sector exposure down",
-  CONCENTRATION_INCREASE: "Concentration up",
-  CONCENTRATION_DECREASE: "Concentration down",
-  SUSPECTED_CORPORATE_ACTION: "Suspected corporate action",
-};
+export function eventValue(e: ChangeEvent): string {
+  // A corporate action's magnitude is the share ratio, not a weight change.
+  return e.type === "SUSPECTED_CORPORATE_ACTION" ? `×${e.magnitude.toFixed(2)}` : pp(e.magnitude);
+}
 
 export default function EventList({
   events,
@@ -21,49 +16,48 @@ export default function EventList({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
-  return (
-    <section className="min-w-0 rounded border border-zinc-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Events</h2>
-      <p className="mb-2 text-sm text-zinc-600">
-        Click an event to highlight its holdings in the table below.
+  if (events.length === 0) {
+    return (
+      <p className="px-4 py-6 text-center text-sm text-muted">
+        No change crossed the event thresholds in this range.
       </p>
-      {events.length === 0 ? (
-        <p className="rounded bg-zinc-50 px-3 py-4 text-sm text-zinc-600">
-          No change crossed the event thresholds in this range.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {events.map((e) => {
-            const selected = e.id === selectedId;
-            const n = e.contributing_security_ids.length;
-            return (
-              <li key={e.id}>
-                <button
-                  type="button"
-                  data-event-id={e.id}
-                  aria-pressed={selected}
-                  onClick={() => onSelect(selected ? null : e.id)}
-                  className={`w-full rounded border px-3 py-2 text-left text-sm transition-colors ${
-                    selected
-                      ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500"
-                      : "border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50"
-                  }`}
-                >
-                  <div className="flex justify-between gap-2 text-xs text-zinc-500">
-                    <span className="font-medium uppercase tracking-wide">
-                      {TYPE_LABELS[e.type] ?? e.type}
-                    </span>
-                    <span>
-                      {n} holding{n === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  <div className="mt-0.5">{e.description}</div>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+    );
+  }
+  return (
+    <div className="text-sm">
+      <div className="label sticky top-0 grid grid-cols-[6.5rem_1fr_4.75rem] gap-2 border-b border-line bg-panel px-3 py-2">
+        <span>Type</span>
+        <span>Subject</span>
+        <span className="text-right">Δ</span>
+      </div>
+      <ul>
+        {events.map((e) => {
+          const selected = e.id === selectedId;
+          const isSplit = e.type === "SUSPECTED_CORPORATE_ACTION";
+          return (
+            <li key={e.id}>
+              <button
+                type="button"
+                data-event-id={e.id}
+                aria-pressed={selected}
+                title={e.description}
+                onClick={() => onSelect(selected ? null : e.id)}
+                className={`grid w-full grid-cols-[6.5rem_1fr_4.75rem] items-center gap-2 border-b border-line/60 px-3 py-2 text-left ${
+                  selected ? "bg-accent-strong/15 shadow-[inset_2px_0_0_var(--color-accent)]" : "hover:bg-panel-2"
+                }`}
+              >
+                <span className={`font-mono text-[11px] ${isSplit ? "text-activity" : tone(e.magnitude)}`}>
+                  {EVENT_TYPES[e.type]?.short ?? e.type}
+                </span>
+                <span className="truncate">{e.subject === "portfolio" ? "Portfolio" : e.subject}</span>
+                <span className={`text-right font-mono tabular-nums ${isSplit ? "text-activity" : tone(e.magnitude)}`}>
+                  {eventValue(e)}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

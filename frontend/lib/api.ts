@@ -20,6 +20,23 @@ export type SnapshotMeta = {
 
 export type Snapshot = SnapshotMeta & { ingested_at: string };
 
+export type Health = { status: string; db: string; fund_count: number; snapshot_count: number };
+
+export type HoldingRow = {
+  security_id: string;
+  ticker: string;
+  name: string;
+  asset_class: string;
+  source_sector: string | null;
+  sector: string;
+  shares: number;
+  price: number | null;
+  market_value: number;
+  reported_weight: number | null;
+};
+
+export type Holdings = { fund: string; snapshot: Snapshot; holdings: HoldingRow[] };
+
 export type FromCfTo = { from: number; cf: number; to: number };
 
 export type Summary = {
@@ -115,6 +132,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 export const api = {
+  health: (signal?: AbortSignal) => getJson<Health>("/health", signal),
   funds: (signal?: AbortSignal) => getJson<Fund[]>("/funds", signal),
   snapshots: (ticker: string, signal?: AbortSignal) =>
     getJson<Snapshot[]>(`/funds/${encodeURIComponent(ticker)}/snapshots`, signal),
@@ -123,7 +141,11 @@ export const api = {
       `/funds/${encodeURIComponent(ticker)}/changes?from=${from}&to=${to}`,
       signal,
     ),
+  holdings: (ticker: string, date: string, signal?: AbortSignal) =>
+    getJson<Holdings>(`/funds/${encodeURIComponent(ticker)}/holdings?date=${date}`, signal),
 };
+
+export const apiDocsUrl = `${API_URL}/docs`;
 
 export function holdingsUrl(ticker: string, date: string): string {
   return `${API_URL}/funds/${encodeURIComponent(ticker)}/holdings?date=${date}`;
