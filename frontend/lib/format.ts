@@ -42,3 +42,16 @@ export function signedHhi(x: number): string {
   const v = Number(x.toFixed(4));
   return signed(Math.abs(v).toFixed(4), v < 0, v === 0);
 }
+
+/** Compact dollars: 748681434.8 -> "$748.7M". */
+export function money(x: number): string {
+  const abs = Math.abs(x);
+  const [div, unit] = abs >= 1e9 ? [1e9, "B"] : abs >= 1e6 ? [1e6, "M"] : abs >= 1e3 ? [1e3, "K"] : [1, ""];
+  return `${x < 0 ? MINUS : ""}$${(abs / div).toFixed(div === 1 ? 2 : 1)}${unit}`;
+}
+
+/** Short date for dense rows: "2026-10-01" -> "Oct 1". */
+export function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}

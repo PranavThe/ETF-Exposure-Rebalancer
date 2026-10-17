@@ -1,5 +1,104 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@theme {
+  --color-page: #08080a;
+  --color-base: #0b0b0d;
+  --color-panel: #121215;
+  --color-panel-2: #18181c;
+  --color-panel-3: #1f1f24;
+  --color-line: #222227;
+  --color-line-2: #2d2d33;
+  --color-fg: #ececf1;
+  --color-muted: #9d9daa;
+  --color-faint: #66666f;
+  --color-accent: #a6a1ff;
+  --color-accent-strong: #7a73f0;
+  --color-up: #34c79f;
+  --color-down: #f25c7f;
+  /* Chart series, validated for colour-vision separation on the panel surface. */
+  --color-price: #7a73f0;
+  --color-activity: #c98500;
+}
+
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-base);
+  color: var(--color-fg);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent-strong) 45%, transparent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-2) transparent;
+}
+
+/* A tab in a panel header, Kairos-terminal style: "Chart ×  +". */
+.panel-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-faint);
+  border-right: 1px solid var(--color-line);
+  white-space: nowrap;
+}
+.panel-tab:hover {
+  color: var(--color-muted);
+}
+.panel-tab[aria-selected="true"] {
+  color: var(--color-fg);
+  background: var(--color-panel-2);
+}
+
+/* Small uppercase mono label used for stat captions and table headers. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ticker-track {
+  animation: ticker 60s linear infinite;
+}
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+.flow-dash {
+  stroke-dasharray: 4 8;
+  animation: flow-dash 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track,
+  .flow-dash {
+    animation: none;
+  }
 }

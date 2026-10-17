@@ -2,31 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import type { HoldingChange, Status } from "@/lib/api";
+import type { HoldingChange } from "@/lib/api";
 import { pct, pp, shares, signedPct } from "@/lib/format";
-
-const STATUS: Record<Status, { label: string; className: string }> = {
-  ADDED: { label: "Added", className: "bg-emerald-100 text-emerald-900" },
-  REMOVED: { label: "Removed", className: "bg-red-100 text-red-900" },
-  INCREASED: { label: "Increased position", className: "bg-blue-100 text-blue-900" },
-  DECREASED: { label: "Decreased position", className: "bg-amber-100 text-amber-900" },
-  UNCHANGED: { label: "Unchanged", className: "bg-zinc-100 text-zinc-700" },
-};
-
-const FLAGS: Record<string, { label: string; title: string }> = {
-  SUSPECTED_CORPORATE_ACTION: {
-    label: "Suspected split",
-    title: "Share count and price moved by offsetting ratios; not counted as portfolio activity.",
-  },
-  PRICE_ESTIMATED: {
-    label: "Price estimated",
-    title: "No later price for a removed holding; the counterfactual uses the earlier price.",
-  },
-  DILUTION: {
-    label: "Dilution",
-    title: "Share count did not change materially; the weight moved because other positions changed size.",
-  },
-};
+import { FLAGS, STATUS, tone } from "@/lib/labels";
 
 type SortKey = "weight_change" | "price_effect" | "activity_effect" | "security";
 
@@ -45,10 +23,12 @@ export default function HoldingsTable({
   holdings,
   highlighted,
   scrollKey,
+  onSelect,
 }: {
   holdings: HoldingChange[];
   highlighted: Set<string>;
   scrollKey: string | null;
+  onSelect?: (securityId: string) => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("weight_change");
   const sortValue = SORTS[sortKey];
@@ -61,7 +41,7 @@ export default function HoldingsTable({
   });
   const firstHighlighted = rows.find((h) => highlighted.has(h.security_id))?.security_id;
 
-  // Scroll to the first highlighted row whenever a new event is selected.
+  // Scroll to the first highlighted row whenever a new selection is made.
   useEffect(() => {
     if (scrollKey && firstHighlighted) {
       document.getElementById(rowId(firstHighlighted))?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -72,97 +52,82 @@ export default function HoldingsTable({
   function header(key: SortKey, label: string, className = "") {
     const active = sortKey === key;
     return (
-      <th className={`px-2 py-2 font-medium ${className}`} aria-sort={active ? "descending" : undefined}>
-        <button
-          type="button"
-          onClick={() => setSortKey(key)}
-          className={`hover:underline ${active ? "text-zinc-900" : ""}`}
-        >
+      <th className={`px-3 py-2 font-normal ${className}`} aria-sort={active ? "descending" : undefined}>
+        <button type="button" onClick={() => setSortKey(key)} className={`uppercase hover:text-fg ${active ? "text-fg" : ""}`}>
           {label}
-          {active ? " ▾" : ""}
+          {active ? " ↓" : ""}
         </button>
       </th>
     );
   }
 
   return (
-    <section className="min-w-0 rounded border border-zinc-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Holdings</h2>
-      <p className="mb-2 text-sm text-zinc-600">
-        Price effect is the weight change from price movement alone (earlier share counts at later prices).
-        Portfolio activity is the rest. Flow-adjusted share change removes the fund-wide scaling from
-        creations and redemptions.
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm tabular-nums">
-          <thead className="border-b border-zinc-200 text-xs text-zinc-500">
-            <tr className="text-right">
-              {header("security", "Security", "text-left")}
-              <th className="px-2 py-2 text-left font-medium">Sector</th>
-              <th className="px-2 py-2 text-left font-medium">Status</th>
-              <th className="px-2 py-2 font-medium">Shares</th>
-              <th className="px-2 py-2 font-medium">Flow-adjusted share change</th>
-              <th className="px-2 py-2 font-medium">Weight</th>
-              {header("weight_change", "Weight change")}
-              {header("price_effect", "Price effect")}
-              {header("activity_effect", "Portfolio activity")}
-              <th className="px-2 py-2 text-left font-medium">Flags</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((h) => {
-              const isHighlighted = highlighted.has(h.security_id);
-              const status = STATUS[h.status];
-              return (
-                <tr
-                  key={h.security_id}
-                  id={rowId(h.security_id)}
-                  data-highlighted={isHighlighted ? "true" : undefined}
-                  className={`border-b border-zinc-100 text-right ${
-                    isHighlighted ? "bg-yellow-100 outline outline-2 -outline-offset-2 outline-yellow-400" : ""
-                  }`}
-                >
-                  <td className="px-2 py-1.5 text-left">
-                    <div className="font-medium">{h.ticker || h.name}</div>
-                    {h.ticker && <div className="text-xs text-zinc-500">{h.name}</div>}
-                  </td>
-                  <td className="px-2 py-1.5 text-left">{h.sector}</td>
-                  <td className="px-2 py-1.5 text-left">
-                    <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs ${status.className}`}>
-                      {status.label}
+    <table className="w-full whitespace-nowrap text-sm tabular-nums">
+      <thead className="label sticky top-0 z-10 bg-panel">
+        <tr className="border-b border-line text-right">
+          {header("security", "Security", "text-left")}
+          <th className="px-3 py-2 text-left font-normal">Status</th>
+          <th className="px-3 py-2 font-normal">Weight</th>
+          {header("weight_change", "Weight Δ")}
+          {header("price_effect", "Price")}
+          {header("activity_effect", "Activity")}
+          <th className="px-3 py-2 font-normal">Flow-adj. shares</th>
+          <th className="px-3 py-2 font-normal">Shares</th>
+          <th className="px-3 py-2 text-left font-normal">Sector</th>
+          <th className="px-3 py-2 text-left font-normal">Flags</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((h) => {
+          const isHighlighted = highlighted.has(h.security_id);
+          const status = STATUS[h.status];
+          return (
+            <tr
+              key={h.security_id}
+              id={rowId(h.security_id)}
+              data-highlighted={isHighlighted ? "true" : undefined}
+              onClick={() => onSelect?.(h.security_id)}
+              className={`cursor-pointer border-b border-line/60 text-right ${
+                isHighlighted
+                  ? "bg-accent-strong/15 shadow-[inset_2px_0_0_var(--color-accent)]"
+                  : "hover:bg-panel-2"
+              }`}
+            >
+              <td className="px-3 py-1.5 text-left">
+                <span className="font-medium">{h.ticker || h.name}</span>
+                {h.ticker && <span className="ml-2 hidden text-xs text-faint 2xl:inline">{h.name}</span>}
+              </td>
+              <td className="px-3 py-1.5 text-left">
+                <span className={`rounded px-1.5 py-0.5 text-xs ${status.className}`}>{status.label}</span>
+              </td>
+              <td className="px-3 py-1.5 font-mono text-xs">
+                {pct(h.w_from)} → {pct(h.w_to)}
+              </td>
+              <td className={`px-3 py-1.5 font-mono text-xs font-semibold ${tone(h.w_to - h.w_from)}`}>
+                {pp(h.w_to - h.w_from)}
+              </td>
+              <td className="px-3 py-1.5 font-mono text-xs">{pp(h.price_effect)}</td>
+              <td className="px-3 py-1.5 font-mono text-xs">{pp(h.activity_effect)}</td>
+              <td className={`px-3 py-1.5 font-mono text-xs ${h.adj_share_change === null ? "text-faint" : tone(h.adj_share_change)}`}>
+                {h.adj_share_change === null ? "—" : signedPct(h.adj_share_change)}
+              </td>
+              <td className="px-3 py-1.5 font-mono text-xs">
+                {shares(h.shares_from)} → {shares(h.shares_to)}
+              </td>
+              <td className="px-3 py-1.5 text-left text-muted">{h.sector}</td>
+              <td className="px-3 py-1.5 text-left">
+                <span className="flex gap-1">
+                  {h.flags.map((f) => (
+                    <span key={f} title={FLAGS[f]?.title} className="rounded border border-line-2 px-1.5 py-0.5 text-[11px] text-muted">
+                      {FLAGS[f]?.label ?? f}
                     </span>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1.5">
-                    {shares(h.shares_from)} → {shares(h.shares_to)}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    {h.adj_share_change === null ? "—" : signedPct(h.adj_share_change)}
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1.5">
-                    {pct(h.w_from)} → {pct(h.w_to)}
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 font-medium">{pp(h.w_to - h.w_from)}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{pp(h.price_effect)}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{pp(h.activity_effect)}</td>
-                  <td className="px-2 py-1.5 text-left">
-                    <div className="flex flex-wrap gap-1">
-                      {h.flags.map((f) => (
-                        <span
-                          key={f}
-                          title={FLAGS[f]?.title}
-                          className="whitespace-nowrap rounded border border-zinc-300 px-1.5 py-0.5 text-xs"
-                        >
-                          {FLAGS[f]?.label ?? f}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
+                  ))}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
