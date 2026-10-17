@@ -1,0 +1,5 @@
+date,fund,security_id,ticker,name,asset_class,shares,price,market_value,weight
+2026-10-01,DEMO,AAA,AAA,AAA Corp,equity,100,10,1000,0.25
+2026-10-01,DEMO,BBB,BBB,BBB Corp,equity,200,5,1000,0.25
+2026-10-01,DEMO,CCC,CCC,CCC Corp,equity,50,20,1000,0.25
+2026-10-01,DEMO,DDD,DDD,DDD Corp,equity,100,10,1000,0.25

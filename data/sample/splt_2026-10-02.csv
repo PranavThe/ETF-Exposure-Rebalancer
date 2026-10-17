@@ -1,0 +1,4 @@
+date,fund,security_id,ticker,name,asset_class,shares,price,market_value,weight
+2026-10-02,SPLT,FFF,FFF,FFF Corp,equity,200,25.50,5100,0.3377483444
+2026-10-02,SPLT,GGG,GGG,GGG Corp,equity,100,50,5000,0.3311258278
+2026-10-02,SPLT,HHH,HHH,HHH Corp,equity,100,50,5000,0.3311258278
