@@ -115,6 +115,15 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 | `GET /funds/{ticker}/snapshots` | dates with `source_url, content_hash, row_count, ingested_at` |
 | `GET /funds/{ticker}/holdings?date=YYYY-MM-DD` | the stored rows with resolved sectors (the "view underlying data" link) |
 | `GET /funds/{ticker}/changes?from=&to=` | the full comparison; 404 for an unknown fund or date, 422 when `from ≥ to` |
+| `POST /portfolios` | create an anonymous saved portfolio; returns its edit key once |
+| `GET /portfolios/{id}` | portfolio name and allocated funds |
+| `PUT /portfolios/{id}` | replace name and fund weights; requires `X-Portfolio-Edit-Key` |
+| `DELETE /portfolios/{id}` | delete a portfolio; requires `X-Portfolio-Edit-Key` |
+| `GET /portfolios/{id}/latest` | each allocated fund's newest snapshot and holdings, with coverage weight |
+
+Portfolio requests use fractional weights that sum to 1 when funds are present. An empty portfolio
+can be created first and allocated later. See [the portfolio API contract](docs/portfolio-api.md)
+for request examples, missing-data behavior, and the analytics handoff.
 
 Interactive docs are at http://localhost:8000/docs.
 
@@ -148,7 +157,7 @@ One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on
 
 **3. Let the frontend call the API**
 1. In the API project, add `CORS_ORIGINS=https://<frontend-domain>`. Separate several origins with
-   commas, or use `*`, since the API is read-only and public.
+   commas. Portfolio write requests use an edit key, so configure the actual frontend origin.
 2. Redeploy the API.
 
 Make `main` the GitHub default branch so Vercel builds production from it.
