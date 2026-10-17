@@ -1,0 +1,151 @@
+/*
+  Marketing-site styles: keyframes and a few effects that utilities cannot express.
+  Imported once by app/(site)/layout.tsx. Every class is prefixed "site-" so nothing
+  collides with the app. Colours are literal hex values that mirror globals.css tokens.
+*/
+
+/* Hero: diverging bars that slowly grow and shrink from a shared zero axis. */
+@keyframes site-drift {
+  0%,
+  100% {
+    transform: scaleX(var(--from, 0.6));
+  }
+  50% {
+    transform: scaleX(var(--to, 1));
+  }
+}
+.site-drift {
+  transform-box: view-box;
+  animation: site-drift var(--dur, 12s) ease-in-out var(--delay, 0s) infinite;
+}
+
+/* Hero: a faint highlight band that sweeps down the bar field. */
+@keyframes site-scan {
+  from {
+    transform: translateY(-60%);
+  }
+  to {
+    transform: translateY(60%);
+  }
+}
+.site-scan {
+  background-image: linear-gradient(
+    180deg,
+    transparent 44%,
+    rgba(166, 161, 255, 0.07) 50%,
+    transparent 56%
+  );
+  animation: site-scan 11s linear infinite;
+}
+
+/* A soft pulse for the glowing dots on the pipeline diagram's output pipe. */
+@keyframes site-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.site-pulse {
+  animation: site-pulse 2.4s ease-in-out infinite;
+}
+
+/* Headline gradient: white into lavender. */
+.site-gradient-text {
+  background-image: linear-gradient(100deg, #ffffff 0%, #ecebff 38%, #b9b5ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Footer: the enormous headline fades out to the right, like a watermark. */
+.site-fade-text {
+  background-image: linear-gradient(90deg, rgba(236, 236, 241, 0.2) 0%, rgba(236, 236, 241, 0.07) 55%, rgba(236, 236, 241, 0) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Dotted fill used inside the pipeline's API box and the hero backdrop. */
+.site-dots {
+  background-image: radial-gradient(rgba(236, 236, 241, 0.09) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+/* Scroll reveal. Content renders visible; Reveal hides only what starts below the fold. */
+.site-reveal[data-reveal="hidden"] {
+  opacity: 0;
+  transform: translateY(18px);
+}
+.site-reveal[data-reveal="shown"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Accordion panel: animate height by moving between 0fr and 1fr grid rows. */
+.site-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms ease;
+}
+.site-collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.site-collapse > div {
+  overflow: hidden;
+}
+
+/* The + icon turns into an x when its row opens. */
+.site-plus {
+  transition: transform 220ms ease;
+}
+[aria-expanded="true"] .site-plus {
+  transform: rotate(45deg);
+}
+
+/* The CTA's corner crosshairs step outward on hover. */
+.site-cta .site-corner {
+  transition: transform 200ms ease;
+}
+.site-cta:hover .site-corner-tl,
+.site-cta:focus-visible .site-corner-tl {
+  transform: translate(-3px, -3px);
+}
+.site-cta:hover .site-corner-tr,
+.site-cta:focus-visible .site-corner-tr {
+  transform: translate(3px, -3px);
+}
+.site-cta:hover .site-corner-bl,
+.site-cta:focus-visible .site-corner-bl {
+  transform: translate(-3px, 3px);
+}
+.site-cta:hover .site-corner-br,
+.site-cta:focus-visible .site-corner-br {
+  transform: translate(3px, 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-drift,
+  .site-scan,
+  .site-pulse {
+    animation: none;
+  }
+  .site-scan {
+    display: none;
+  }
+  .site-reveal[data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .site-collapse,
+  .site-plus,
+  .site-cta .site-corner {
+    transition: none;
+  }
+}
