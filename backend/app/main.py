@@ -20,6 +20,11 @@ def cors_origins() -> list[str]:
     return LOCAL_ORIGINS + [o for o in extra if o]
 
 
+def cors_origin_regex() -> str | None:
+    """An optional pattern for origins that change per deploy, such as Vercel preview URLs."""
+    return os.environ.get("CORS_ORIGIN_REGEX", "").strip() or None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -36,6 +41,7 @@ app = FastAPI(title="FundShift", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins(),
+    allow_origin_regex=cors_origin_regex(),
     allow_methods=["GET"],
     allow_headers=["*"],
 )
