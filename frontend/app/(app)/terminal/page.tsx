@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import TerminalDesk from "@/components/terminal/TerminalDesk";
+import { BRAND } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Terminal · FundShift" };
+export const metadata: Metadata = { title: `Terminal · ${BRAND}` };
 
 export default function TerminalPage() {
   return (

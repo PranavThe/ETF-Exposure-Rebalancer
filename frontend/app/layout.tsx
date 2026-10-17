@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { BRAND } from "@/lib/brand";
+
 import "./globals.css";
 
 // Geist and Geist Mono are bundled (SIL OFL, see fonts/OFL-Geist.txt) so builds need no network.
@@ -17,7 +19,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "FundShift",
+  title: BRAND,
   description: "How an active ETF's portfolio changed: price movement versus portfolio activity.",
 };
 

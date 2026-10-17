@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiDocsUrl } from "@/lib/api";
+import { BRAND } from "@/lib/brand";
 import { useFunds, useHealth } from "@/lib/hooks";
 
 const LINKS = [
@@ -79,7 +80,7 @@ export default function AppNav() {
   return (
     <header className="flex h-12 shrink-0 items-center gap-4 border-b border-line bg-base px-4">
       <Link href="/" className="text-[19px] font-semibold tracking-tight text-fg">
-        FundShift
+        {BRAND}
       </Link>
       <nav className="flex items-center gap-1 overflow-x-auto">
         {LINKS.map((l) => {
