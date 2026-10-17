@@ -4,7 +4,8 @@ SPEC.md is the source of truth. Never edit a golden value (SPEC §10) to make a 
 if one looks wrong, stop and show the arithmetic.
 
 ## Commands
-- `make setup`: create `.venv`, install `requirements.txt`, `npm install` in `frontend/`
+- `make setup`: create `.venv`, install `requirements-dev.txt`, `npm install` in `frontend/`
+  (`requirements.txt` is runtime-only: Vercel installs it for the API)
 - `make test`: run pytest (`backend/tests`)
 - `make ingest-sample`: ingest every `data/sample/*.csv` (rerunning prints `already ingested`)
 - `make ingest-raw`: ingest every real issuer file in `data/raw/` (`make demo` runs both)
@@ -12,7 +13,9 @@ if one looks wrong, stop and show the arithmetic.
 - `make demo`: reset DB, ingest samples and raw files, start the API
 - Frontend: `frontend/` (Next.js 16; see `frontend/AGENTS.md`). Check with `npm run build` and `npm run lint`.
 - One file: `.venv/bin/python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.csv [--adapter sample|ark] [--replace]`
-- DB: `DATABASE_URL` (default `sqlite:///./fundshift.db`). Tables come from `metadata.create_all`, no Alembic.
+- DB: `DATABASE_URL` (default `sqlite:///./fundshift.db`; `postgres://` maps to psycopg 3). No Alembic.
+- Deploy: two Vercel projects from this repo (API at `./` via `index.py` + `vercel.json`, whose build
+  runs `scripts/seed_db.py` into Neon; frontend at `frontend/`). See README "Deploy on Vercel".
 
 ## Units (SPEC §4)
 - Every weight, exposure, drift and effect is a FRACTION in code, DB and API (0.07 = 7%).

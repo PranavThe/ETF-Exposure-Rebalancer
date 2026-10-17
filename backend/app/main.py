@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.pipeline.reference import sync_reference
@@ -22,8 +23,12 @@ def cors_origins() -> list[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    with Session(get_engine()) as session, session.begin():
-        sync_reference(session)
+    try:
+        with Session(get_engine()) as session, session.begin():
+            sync_reference(session)
+    except IntegrityError:
+        # Another instance starting at the same moment loaded the same reference data first.
+        pass
     yield
 
 

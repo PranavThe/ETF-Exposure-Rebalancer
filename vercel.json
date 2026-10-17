@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python scripts/seed_db.py",
+  "functions": {
+    "index.py": {
+      "excludeFiles": "{frontend/**,backend/tests/**,.venv/**}"
+    }
+  }
+}

@@ -305,3 +305,32 @@ def test_real_ark_file_ingests_and_reingest_is_a_noop(db_url, capsys):
         assert snapshot.source_url.startswith("https://assets.ark-funds.com/")
         tsla = s.scalars(select(Holding).where(Holding.security_id == "88160R101")).one()
         assert close(tsla.price, 748681434.80 / 2065670)  # derived: the file has no price column
+
+
+def load_seed_script():
+    import importlib.util
+
+    path = SAMPLE_DIR.parents[1] / "scripts" / "seed_db.py"
+    spec = importlib.util.spec_from_file_location("seed_db", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_seed_script_loads_everything_and_is_rerunnable(db_url, monkeypatch, capsys):
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.chdir(SAMPLE_DIR.parents[1])  # restored afterwards; the script chdirs to the repo root
+    seed = load_seed_script()
+    assert seed.main() == 0
+    assert seed.main() == 0
+    out = output(capsys)
+    assert out.count("already ingested") == 8  # 7 sample files + 1 real ARKK file
+    with Session(db.get_engine()) as s:
+        assert s.scalar(select(func.count(Snapshot.id))) == 8
+
+
+def test_seed_script_on_vercel_requires_a_database(monkeypatch, capsys):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    assert load_seed_script().main() == 1
+    assert "DATABASE_URL" in output(capsys)

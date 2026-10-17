@@ -14,7 +14,7 @@ changing share counts).
 Requires Python 3.11+ and Node 20+.
 
 ```
-make setup    # .venv + requirements.txt, npm install in frontend/
+make setup    # .venv + requirements-dev.txt, npm install in frontend/
 make test     # pytest: analytics, pipeline and API suites
 make demo     # reset the DB, ingest data/sample and data/raw, start the API on :8000
 make web      # second terminal: frontend on http://localhost:3000
@@ -121,12 +121,43 @@ Interactive docs are at http://localhost:8000/docs.
 CORS allows `http://localhost:3000`. Add deployed frontend origins with a comma-separated
 `CORS_ORIGINS` environment variable, for example `CORS_ORIGINS=https://fundshift.vercel.app`.
 
+## Deploy on Vercel
+
+One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on every push to `main`.
+
+**1. API project**
+1. Vercel → Add New → Project → import this repo. Name it, for example, `fundshift-api`.
+   Leave **Root Directory** as `./`. Vercel detects FastAPI from `requirements.txt` and serves
+   `app` from `index.py`.
+2. Deploy. The first build fails with `DATABASE_URL is not set`, which is expected.
+3. In the project's **Storage** tab, create a **Neon** Postgres database and **Connect** it to this
+   project. Select Production (and Preview if you want), and leave the environment variable prefix
+   empty so the variable is called `DATABASE_URL`.
+4. **Deployments → Redeploy.** The build command in `vercel.json` (`python scripts/seed_db.py`)
+   loads `data/sample` and `data/raw` into Neon. The build log shows the `inserted ...` lines.
+   Later deploys print `already ingested` and load only new files, so committing a new
+   `data/raw/ARKK_<date>.csv` is enough to add a snapshot.
+5. Check `https://<api-domain>/health`. It should report `"snapshot_count": 8`.
+
+**2. Frontend project**
+1. Import the same repo again as a second project, for example `fundshift`, with
+   **Root Directory: `frontend`**.
+2. Before deploying, add the environment variable `NEXT_PUBLIC_API_URL=https://<api-domain>`. It
+   is baked in at build time, so changing it later needs a redeploy.
+3. Deploy.
+
+**3. Let the frontend call the API**
+1. In the API project, add `CORS_ORIGINS=https://<frontend-domain>`. Separate several origins with
+   commas, or use `*`, since the API is read-only and public.
+2. Redeploy the API.
+
+Make `main` the GitHub default branch so Vercel builds production from it.
+
 ## Database
 
-SQLite by default (`DATABASE_URL=sqlite:///./fundshift.db`). For Postgres, set for example
-`DATABASE_URL=postgresql+psycopg://user:pass@host/fundshift` and install the driver yourself
-(`pip install "psycopg[binary]"`). The driver is not in `requirements.txt`. Tables are created with
-`metadata.create_all`, without migrations. Checked against PostgreSQL 16 with psycopg 3: ingest,
+SQLite by default (`DATABASE_URL=sqlite:///./fundshift.db`). For Postgres, set `DATABASE_URL`
+to a `postgres://`, `postgresql://` or `postgresql+psycopg://` URL. The psycopg 3 driver is in
+`requirements.txt`. Tables are created with `metadata.create_all`, without migrations. Checked against PostgreSQL 16 with psycopg 3: ingest,
 duplicate/conflict/replace, rollback and the DEMO golden values all behave as on SQLite.
 
 ## Layout
@@ -140,7 +171,8 @@ frontend/           Next.js + Tailwind + Recharts single page
 data/sample/        synthetic fixtures (DEMO, SPLT, FLOW)
 data/raw/           real issuer files
 data/reference/     funds.csv, sectors.csv
-scripts/            run_pipeline.py, fetch_holdings.py
+scripts/            run_pipeline.py, fetch_holdings.py, seed_db.py (Vercel build step)
+index.py, vercel.json  Vercel entrypoint and build config for the API
 ```
 
 ## Known limitations

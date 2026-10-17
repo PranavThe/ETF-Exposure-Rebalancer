@@ -132,3 +132,14 @@ def test_cors_origins_come_from_the_environment(monkeypatch):
 def test_local_frontend_origin_is_allowed(client):
     resp = client.get("/funds", headers={"Origin": "http://localhost:3000"})
     assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_postgres_urls_use_psycopg(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host/db?sslmode=require")
+    assert db.database_url() == "postgresql+psycopg://u:p@host/db?sslmode=require"
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@host/db")
+    assert db.database_url() == "postgresql+psycopg://u:p@host/db"
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@host/db")
+    assert db.database_url() == "postgresql+psycopg://u:p@host/db"
+    monkeypatch.delenv("DATABASE_URL")
+    assert db.database_url() == "sqlite:///./fundshift.db"

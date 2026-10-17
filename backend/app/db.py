@@ -12,7 +12,12 @@ _engine: Engine | None = None
 
 
 def database_url() -> str:
-    return os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+    """DATABASE_URL, with postgres:// URLs (as Neon and Vercel issue them) mapped to psycopg 3."""
+    url = os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
 
 
 def get_engine() -> Engine:
@@ -20,8 +25,13 @@ def get_engine() -> Engine:
     global _engine
     if _engine is None:
         url = database_url()
-        connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-        _engine = create_engine(url, connect_args=connect_args)
+        if url.startswith("sqlite"):
+            _engine = create_engine(url, connect_args={"check_same_thread": False})
+        else:
+            # Serverless instances sit idle and poolers drop connections, so check before use.
+            # prepare_threshold=None keeps psycopg from relying on server-side prepared statements,
+            # which a transaction-mode pooler (Neon's pooled URL) may not keep.
+            _engine = create_engine(url, pool_pre_ping=True, connect_args={"prepare_threshold": None})
     return _engine
 
 

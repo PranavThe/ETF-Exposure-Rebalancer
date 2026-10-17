@@ -4,7 +4,7 @@ PY := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 setup:
 	python3 -m venv .venv
-	.venv/bin/pip install -r requirements.txt
+	.venv/bin/pip install -r requirements-dev.txt
 	if [ -f frontend/package.json ]; then cd frontend && npm install; fi
 
 test:
