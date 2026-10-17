@@ -32,7 +32,7 @@ function FundSearch() {
   }
 
   return (
-    <div className="relative hidden w-full max-w-xl md:block">
+    <div className="relative w-full max-w-xl">
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -78,11 +78,11 @@ export default function AppNav() {
   const online = health.data?.status === "ok";
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-4 border-b border-line bg-base px-4">
-      <Link href="/" className="text-[19px] font-semibold tracking-tight text-fg">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-base px-3 sm:gap-4 sm:px-4">
+      <Link href="/" className="shrink-0 text-base font-semibold tracking-tight text-fg sm:text-[19px]">
         {BRAND}
       </Link>
-      <nav className="flex items-center gap-1 overflow-x-auto">
+      <nav className="flex items-center gap-0.5 overflow-x-auto sm:gap-1">
         {LINKS.map((l) => {
           const active = pathname === l.href;
           return (
@@ -90,17 +90,17 @@ export default function AppNav() {
               key={l.href}
               href={l.href}
               aria-current={active ? "page" : undefined}
-              className={`rounded px-2.5 py-1 text-sm ${active ? "text-accent" : "text-fg/85 hover:text-fg"}`}
+              className={`rounded px-1.5 py-1 text-[13px] sm:px-2.5 sm:text-sm ${active ? "text-accent" : "text-fg/85 hover:text-fg"}`}
             >
               {l.label}
             </Link>
           );
         })}
       </nav>
-      <div className="flex flex-1 justify-center">
+      <div className="hidden flex-1 justify-center md:flex">
         <FundSearch />
       </div>
-      <div className="flex shrink-0 items-center gap-3 text-sm">
+      <div className="ml-auto flex shrink-0 items-center gap-3 text-sm">
         <span className="hidden items-center gap-1.5 text-muted sm:flex" title={health.error ?? "API health"}>
           <span
             className={`inline-block h-2 w-2 rounded-full ${

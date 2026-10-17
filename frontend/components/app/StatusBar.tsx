@@ -20,13 +20,13 @@ function Clock() {
 export default function StatusBar() {
   const health = useHealth().data;
   return (
-    <footer className="flex h-8 shrink-0 items-center gap-4 border-t border-line bg-base px-4 text-xs text-muted">
+    <footer className="flex min-h-8 shrink-0 items-center gap-4 border-t border-line bg-base px-4 py-1 text-xs text-muted">
       {health && (
         <span className="hidden font-mono sm:inline">
           {health.fund_count} funds · {health.snapshot_count} snapshots
         </span>
       )}
-      <span className="min-w-0 flex-1 truncate text-center text-faint">
+      <span className="min-w-0 flex-1 text-center text-faint sm:truncate">
         Derived from issuer-published holdings snapshots. Not investment advice.
       </span>
       <Link href="/methodology" className="hidden hover:text-fg sm:inline">
