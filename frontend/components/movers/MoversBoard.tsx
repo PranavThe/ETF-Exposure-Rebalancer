@@ -165,7 +165,7 @@ export default function MoversBoard() {
   }
 
   const fundOptions = [
-    { value: "ALL", label: "All funds" },
+    { value: "ALL", label: "Featured funds" },
     ...fundList.map((f) => ({
       value: f.ticker,
       label: f.ticker,

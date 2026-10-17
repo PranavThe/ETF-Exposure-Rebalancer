@@ -53,6 +53,10 @@ export function useFunds(): Resource<Fund[]> {
   return useResource("funds", load.funds);
 }
 
+export function useFund(ticker: string | null): Resource<Fund> {
+  return useResource(ticker, () => api.fund(ticker!));
+}
+
 export function useHealth() {
   return useResource("health", () => api.health());
 }

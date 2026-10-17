@@ -131,9 +131,51 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function sendJson<T>(path: string, method: "POST" | "PUT" | "DELETE", body?: unknown, editKey?: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(editKey ? { "X-Portfolio-Edit-Key": editKey } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(typeof error?.detail === "string" ? error.detail : `API error ${res.status}`);
+  }
+  return res.status === 204 ? undefined as T : res.json() as Promise<T>;
+}
+
+export type PortfolioAllocation = { ticker: string; name: string; issuer: string; weight: number };
+export type Portfolio = { id: string; name: string; funds: PortfolioAllocation[]; created_at: string; updated_at: string };
+export type PortfolioCreated = Portfolio & { edit_key: string };
+export type PortfolioInput = { name: string; funds: { ticker: string; weight: number }[] };
+export type PortfolioFundAnalysis = PortfolioAllocation & { status: string; as_of_date: string | null };
+export type PortfolioExposure = { security_id: string; ticker: string; name: string; asset_class: string; sector: string; weight: number; funds: string[] };
+export type PortfolioAnalysis = {
+  portfolio: Portfolio;
+  coverage_weight: number;
+  analyzed_weight: number;
+  newest_as_of_date: string | null;
+  funds: PortfolioFundAnalysis[];
+  top_exposures: PortfolioExposure[];
+  overlap: PortfolioExposure[];
+  sectors: { name: string; weight: number }[];
+  asset_classes: { name: string; weight: number }[];
+  caveats: string[];
+};
+
 export const api = {
   health: (signal?: AbortSignal) => getJson<Health>("/health", signal),
-  funds: (signal?: AbortSignal) => getJson<Fund[]>("/funds", signal),
+  funds: (signal?: AbortSignal) => getJson<Fund[]>("/funds?loaded_only=true&limit=24", signal),
+  fund: (ticker: string) => getJson<Fund>(`/funds/${encodeURIComponent(ticker)}`),
+  searchEtfs: (q: string, signal?: AbortSignal) => getJson<Fund[]>(`/etfs/search?q=${encodeURIComponent(q)}&limit=20`, signal),
+  portfolio: (id: string) => getJson<Portfolio>(`/portfolios/${encodeURIComponent(id)}`),
+  portfolioAnalysis: (id: string) => getJson<PortfolioAnalysis>(`/portfolios/${encodeURIComponent(id)}/analysis`),
+  createPortfolio: (body: PortfolioInput) => sendJson<PortfolioCreated>("/portfolios", "POST", body),
+  updatePortfolio: (id: string, key: string, body: PortfolioInput) => sendJson<Portfolio>(`/portfolios/${encodeURIComponent(id)}`, "PUT", body, key),
+  deletePortfolio: (id: string, key: string) => sendJson<void>(`/portfolios/${encodeURIComponent(id)}`, "DELETE", undefined, key),
   snapshots: (ticker: string, signal?: AbortSignal) =>
     getJson<Snapshot[]>(`/funds/${encodeURIComponent(ticker)}/snapshots`, signal),
   changes: (ticker: string, from: string, to: string, signal?: AbortSignal) =>

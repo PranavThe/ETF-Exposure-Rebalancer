@@ -61,7 +61,7 @@ class Adapter:
         """False for rows to skip, such as blank lines or a disclaimer footer."""
         return any(cells.values())
 
-    def read(self, path: Path) -> list[Row]:
+    def read(self, path: Path, fund: str | None = None) -> list[Row]:
         file = Path(path).as_posix()
         try:
             f = open(path, newline="", encoding="utf-8-sig")
