@@ -152,3 +152,21 @@ def test_postgres_urls_use_psycopg(monkeypatch):
     assert db.database_url() == "postgresql+psycopg://u:p@host/db"
     monkeypatch.delenv("DATABASE_URL")
     assert db.database_url() == "sqlite:///./fundshift.db"
+
+
+def test_browsers_may_call_every_method_the_api_serves(client):
+    # Renaming a portfolio uses PATCH; a method missing from the CORS list fails only in a browser.
+    from backend.app.main import LOCAL_ORIGINS, app
+
+    def routes(items):
+        for route in items:
+            inner = getattr(route, "original_router", None)  # an included router
+            yield from routes(inner.routes) if inner is not None else [route]
+
+    methods = {m for route in routes(app.routes) for m in getattr(route, "methods", None) or ()} - {"HEAD", "OPTIONS"}
+    assert "PATCH" in methods
+    for method in sorted(methods):
+        response = client.options("/portfolios/any", headers={
+            "Origin": LOCAL_ORIGINS[0], "Access-Control-Request-Method": method,
+            "Access-Control-Request-Headers": "content-type,x-portfolio-edit-key"})
+        assert response.status_code == 200, method

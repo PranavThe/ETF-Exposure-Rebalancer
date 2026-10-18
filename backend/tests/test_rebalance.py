@@ -6,6 +6,7 @@ import pytest
 from backend.analytics.rebalance import (
     CASH_OTHER,
     UNCLASSIFIED,
+    _round,
     build_plans,
     canonical_sector,
     distance,
@@ -217,3 +218,14 @@ def test_no_increase_funds_are_kept_or_reduced_never_increased():
     # Every held fund capped and nothing new allowed: no way to change anything.
     assert build_plans(amounts, weights, {"Technology": 0.5, "Health Care": 0.5}, max_new_funds=0,
                        no_increase={"T", "H"}) == []
+
+
+def test_rounding_never_leaves_a_dollar_in_a_removed_fund():
+    # Rounding the new positions down leaves $1 over; the biggest move is removing OLD, which must
+    # still end at zero rather than receive the stray dollar.
+    weights = {"OLD": TECH, "A": HEALTH, "B": {CASH_OTHER: 1.0}, "C": BLEND_B}
+    allocation = {"OLD": 0.0, "A": 4000.4, "B": 3999.3, "C": 2000.3}
+    out = _round(allocation, {"OLD": 10000.0}, 10000.0)
+    assert out["OLD"] == 0.0
+    assert math.isclose(sum(out.values()), 10000.0, abs_tol=1e-9)
+    assert all(v >= 0 for v in out.values())

@@ -393,7 +393,8 @@ def _allocate(
 
 
 def _round(allocation: dict[str, float], amounts: Mapping[str, float], total_after: float) -> dict[str, float]:
-    """Whole dollars; changes under $1 are dropped; the rounding residual goes to the largest move."""
+    """Whole dollars; changes under $1 are dropped; the rounding residual goes to the largest move
+    among the positions that stay open, so a removed fund never keeps a stray dollar."""
     tickers = set(allocation) | {t for t, a in amounts.items() if a > 0}
     out = {}
     for t in tickers:
@@ -402,7 +403,8 @@ def _round(allocation: dict[str, float], amounts: Mapping[str, float], total_aft
         out[t] = before if abs(after - before) < 1.0 else float(round(after))
     residual = total_after - math.fsum(out.values())
     if abs(residual) >= 0.005:
-        biggest = max(tickers, key=lambda t: (abs(out[t] - amounts.get(t, 0.0)), out[t]))
+        kept = [t for t in tickers if out[t] > 0] or list(tickers)
+        biggest = max(kept, key=lambda t: (abs(out[t] - amounts.get(t, 0.0)), out[t]))
         out[biggest] += residual
     return {t: v for t, v in out.items() if v > 0.005 or amounts.get(t, 0.0) > 0}
 
