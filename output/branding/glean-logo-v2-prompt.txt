@@ -1,0 +1,16 @@
+Generation mode: Built-in image_gen
+
+Use case: logo-brand.
+Design a new alternate logo for the financial analytics company "glean". One finished, polished primary logo on a perfectly flat solid near-black background #08080a. Wide landscape format, logo centered with generous clear space.
+
+Exact and only text: "glean", all lowercase, spelled g-l-e-a-n.
+
+A premium modern financial software identity. Extremely clean, sharp and understated. Bespoke geometric icon followed by an elegant lowercase wordmark.
+
+Icon: A compact architectural G monogram, a single continuous violet #7a73f0 band with uniform thickness, a subtly rounded square exterior, a generous squared interior counter and a short inward horizontal terminal. The G has an intentional clean opening on its right. An elegant, memorable near-square silhouette. Refined proportions and crisp geometry. The monogram should feel lean, precise, and beautifully balanced.
+
+Typography: Custom-looking medium-light neo-grotesk lowercase wordmark in solid off-white #ececf1. Sleek letterforms with generous counters, precise flat terminals, carefully balanced optical kerning. Streamlined rather than heavy. A single-storey lowercase g. The wordmark and icon share the same optical height. Deliberate clear space between them.
+
+Render as pristine professional flat vector-style identity artwork with perfectly uniform fills and immaculate contours, exact geometry and smooth edges. Strictly solid colors: near-black background, violet mark, off-white lettering.
+
+No transparency in this presentation. No textures, rough edges, grain, scratches, glitches, decoration, gradients, shadows, lighting effects, 3D, bevels, glow, chart symbols, arrows, wheat, stars, mockups, extra text, watermarks or contact sheet. One original expertly designed logo, with a clean silhouette that would reproduce in one color.

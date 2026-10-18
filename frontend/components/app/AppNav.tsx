@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import BrandLogo from "@/components/BrandLogo";
 import { api, apiDocsUrl, type Fund } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import { useHealth } from "@/lib/hooks";
@@ -99,8 +100,12 @@ export default function AppNav() {
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-canvas px-3 sm:gap-4 sm:px-4">
-      <Link href="/" className="shrink-0 text-base font-semibold tracking-tight text-fg sm:text-[19px]">
-        {BRAND}
+      <Link
+        href="/"
+        className="inline-flex shrink-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        aria-label={`${BRAND} home`}
+      >
+        <BrandLogo width={108} loading="eager" />
       </Link>
       <nav className="flex items-center gap-0.5 overflow-x-auto sm:gap-1">
         {LINKS.map((l) => {

@@ -1,0 +1,12 @@
+Generation mode: Built-in image_gen
+
+Use case: logo-brand.
+Asset type: Primary company logo for Glean, an ETF holdings and portfolio exposure analytics product.
+Primary request: Design a distinctive, expertly crafted original logo consisting of a compact abstract symbol and the exact lowercase wordmark "glean". The idea is finding a clear signal within the layers of a portfolio.
+Style: Exceptionally restrained Swiss graphic design, crisp flat vector-like contours, strong silhouette, precise optical balance and generous negative space. A serious contemporary financial research company with quiet confidence.
+Symbol: a bespoke geometric lowercase g-inspired form built from a small number of substantial, simple shapes with one deliberate open cut. Subtly suggest revealing an underlying layer. The mark must remain recognizable at favicon size. It should feel thoughtfully drawn, with an elegant visual relationship to the wordmark.
+Typography: Custom-feeling lowercase neo-grotesk sans serif, medium weight, open counters, careful kerning, confident and highly legible. Text verbatim: "glean" (g-l-e-a-n). No other text.
+Color palette: Use a single solid violet #7a73f0 for both symbol and wordmark, drawn from the existing product palette. No gradients.
+Composition: One horizontal logo lockup, symbol beside wordmark, balanced scale and considered spacing, centered with comfortable clear space. Wide landscape canvas.
+Background: Truly transparent alpha, no backdrop.
+Constraints: Only the finished original logo; no contact sheet, no mockup, no business cards, no explanatory captions. No photorealism, 3D, shadows, glow, texture, thin hairlines, literal stock chart, upward arrow, wheat illustration, magnifying glass, or generic four-point sparkle. Do not imitate any existing company's logo.
