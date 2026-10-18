@@ -29,9 +29,8 @@ export default function LandingPage() {
         title="What your ETFs really hold"
         intro={
           <p>
-            An ETF is a basket of companies. {BRAND} reads each fund&apos;s latest published holdings, groups them by
-            sector and blends them by the dollars you have in each fund. The result is your real sector mix, in one
-            picture.
+            An ETF is a basket of holdings. {BRAND} reads available holdings, groups them by sector and blends them
+            by the dollars you have in each covered fund. The result shows the part of your sector mix it can calculate.
           </p>
         }
         items={[
@@ -93,8 +92,8 @@ export default function LandingPage() {
             title: "Plain words, exact numbers",
             body: (
               <p>
-                Scythe runs on Claude. It changes only what you mention, keeps the total at 100%, and tells you what
-                moved in % and pp.
+                Scythe can use Claude, with a basic reader when Claude is unavailable. It changes the target mix,
+                keeps the total at 100%, and shows weights in % and changes in pp.
               </p>
             ),
           },
@@ -152,8 +151,8 @@ export default function LandingPage() {
             title: "No clutter",
             body: (
               <p>
-                Positions under 1% of your portfolio are dropped, a new ETF joins only if it brings you at least 0.5 pp
-                closer, and every amount is in whole dollars.
+                New positions under 1% are dropped, and rearrangements can remove tiny positions you already hold.
+                A new ETF joins only if it brings you at least 0.5 pp closer; plan amounts are rounded to dollars.
               </p>
             ),
           },
@@ -161,7 +160,8 @@ export default function LandingPage() {
             title: "Saved without an account",
             body: (
               <p>
-                Your ETFs and target save to a private link. The key that lets you edit them stays in this browser.
+                Your ETFs and target save to a shareable link. Anyone with the link can view them; the private key
+                that lets you edit them stays in this browser.
               </p>
             ),
           },

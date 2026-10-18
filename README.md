@@ -79,16 +79,18 @@ or API keys; the assistant uses its built-in rule-based reader when no Anthropic
 
 > [!NOTE]
 > Bundled holdings cover **ARKK** and the synthetic **DEMO**, **SPLT**, and **FLOWTEST** fixtures.
-> The example always loads **IVV $6,000 / IYW $3,000 / ARKK $1,000**, but IVV and IYW show as
-> missing until you import their holdings. For a fresh demo, add ARKK to inspect exposure.
-> Import eligible ETFs to explore additional plans; synthetic funds are never suggested.
+> The example always loads **IVV $6,000 / IYW $3,000 / ARKK $1,000**. When a fund is added, the
+> app tries a bounded TickerInside lookup if it has no stored provider snapshot. IVV and IYW
+> remain flagged if that lookup is unavailable and you have not imported issuer/SEC holdings.
+> For a fresh demo, add ARKK to inspect exposure. Import eligible ETFs to explore additional
+> plans; synthetic funds are never suggested.
 > See [ETF data sources](docs/etf-sources.md) for ingestion instructions.
 
 ## How it works
 
 | Step | What Glean computes |
 | --- | --- |
-| **Look inside each ETF** | Groups positive holding values by sector. A newer stored TickerInside snapshot can supply sector weights instead of an issuer or SEC snapshot. |
+| **Look inside each ETF** | Groups positive issuer/SEC holding market values by sector, or uses reported TickerInside weights when that stored snapshot is newer. |
 | **Combine your exposure** | Blends available ETFs' sector mixes in proportion to your dollar amounts. Funds without data remain visible and are excluded from the planner's mix and moves. |
 | **Apply your target** | Uses the sector mix you choose with sliders or Scythe. The assistant translates your request into numbers. |
 | **Build plans** | Finds allocations using your existing portfolio total, either within your current ETFs or with a limited number of new funds. |
@@ -114,7 +116,8 @@ weight differences: 0 means identical mixes; 1 means no overlap.
   increased. Synthetic fixtures are never suggested.
 - **Optimization:** a bounded least-squares problem balances closeness to the target with a
   small preference for smaller moves. New ETFs are considered one at a time and must improve
-  distance by at least 0.5 pp. The planner prunes small positions using a 1% threshold, rounds
+  distance by at least 0.5 pp each. Any rearrangement that improves the match can be shown,
+  even by less than 0.5 pp. The planner prunes small positions using a 1% threshold, rounds
   amounts to whole dollars, and omits unchanged or duplicate plans.
 - **Scythe, the assistant:** with `ANTHROPIC_API_KEY`, `/chat` uses the model configured in
   [`backend/app/assistant.py`](backend/app/assistant.py). Without a key, or when a supported API
@@ -140,7 +143,7 @@ The planner's formulas, allowlist, and thresholds live in
 | Synthetic fixtures | Repeatable pipeline and analytics examples | Yes — DEMO, SPLT, FLOWTEST |
 | iShares issuer CSVs | Holdings and issuer sector labels | No — import separately |
 | SEC N-PORT | Historical reported holdings | No — download and import separately |
-| TickerInside + Alpaca IEX | Provider holdings weights and daily price bars | No — optional provider sync |
+| TickerInside + Alpaca IEX | Provider holdings weights and stored daily price bars | No — provider lookup can run when a fund is added; a configured weekday sync refreshes holdings and prices |
 
 Production seeding loads the catalog and files in `data/raw/`, excludes `data/sample/`, and removes
 previously seeded synthetic snapshots. Provider weights and prices are stored separately from
@@ -195,7 +198,7 @@ when the API is running.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /health` | Database status, fund count, and snapshot count |
+| `GET /health` | Database status, fund count, issuer/SEC snapshot count, and deployed commit |
 | `GET /etfs/search?q=IVV` | Search registered ETFs and inspect data availability |
 | `GET /etfs/covered` | Allowlisted ETFs with data, plus marked local fixtures |
 | `POST /plan` | Calculate sector exposure and plans for dollar-based holdings |
@@ -235,6 +238,7 @@ through the API.
 | `POST /portfolios/{id}/preview` | Preview changes to an existing portfolio without saving |
 | `GET /portfolios/{id}/preferences` | Read the saved dollar value and target mix |
 | `PUT /portfolios/{id}/preferences` | Save preferences; edit key required |
+| `POST /provider-data/funds/{ticker}/sync` | Fetch TickerInside holdings on first use if none are stored |
 | `GET /provider-data/funds/{ticker}/holdings` | Latest provider weights and changes from the prior source date |
 | `GET /provider-data/prices?symbols=AAPL,MSFT` | Stored Alpaca IEX daily bars; optional `as_of`, `start`, or `end` |
 
@@ -339,7 +343,8 @@ scripts/           Data fetching, ingestion, seeding, and provider sync
 ```
 
 The product name is defined in [`frontend/lib/brand.ts`](frontend/lib/brand.ts).
-The default SQLite filename and some backend labels retain the earlier **FundShift** name.
+The default SQLite filename, `fundshift.db`, and existing deployment hostnames are retained
+for compatibility with saved data and links; the product name is **Glean**.
 
 ## Documentation
 
@@ -367,5 +372,5 @@ The default SQLite filename and some backend labels retain the earlier **FundShi
 ---
 
 <p align="center">
-  <sub>Derived from issuer-published holdings snapshots. Not investment advice.</sub>
+  <sub>Based on dated ETF holdings. Not investment advice.</sub>
 </p>
