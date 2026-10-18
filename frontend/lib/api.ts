@@ -148,7 +148,7 @@ async function sendJson<T>(path: string, method: "POST" | "PUT" | "DELETE", body
 }
 
 export type PortfolioAllocation = { ticker: string; name: string; issuer: string; weight: number };
-export type Portfolio = { id: string; name: string; funds: PortfolioAllocation[]; created_at: string; updated_at: string };
+export type Portfolio = { id: string; name: string; funds: PortfolioAllocation[]; created_at: string | null; updated_at: string | null };
 export type PortfolioCreated = Portfolio & { edit_key: string };
 export type PortfolioInput = { name: string; funds: { ticker: string; weight: number }[] };
 export type PortfolioFundAnalysis = PortfolioAllocation & { status: string; as_of_date: string | null };
@@ -166,6 +166,29 @@ export type PortfolioAnalysis = {
   caveats: string[];
 };
 
+export type SimulationRequest = { target_weights: Record<string, number> };
+export type SimulationProfile = {
+  top_n: number;
+  top_n_share: number;
+  hhi: number;
+  largest_holding_weight: number;
+  largest_sector: string | null;
+  largest_sector_weight: number;
+  sectors: { sector: string; weight: number }[];
+};
+export type SimulationResult = {
+  fund: string;
+  as_of_date: string;
+  risk_scope: string;
+  top_n: number;
+  current: SimulationProfile;
+  scenario: SimulationProfile;
+  change: { top_n_share: number; hhi: number; largest_holding_weight: number; largest_sector_weight: number };
+  holdings: { security_id: string; ticker: string; name: string; sector: string; weight_current: number; weight_target: number; weight_change: number }[];
+  sectors: { sector: string; weight_current: number; weight_target: number; weight_change: number }[];
+  caveats: string[];
+};
+
 export const api = {
   health: (signal?: AbortSignal) => getJson<Health>("/health", signal),
   funds: (signal?: AbortSignal) => getJson<Fund[]>("/funds?loaded_only=true&limit=24", signal),
@@ -173,6 +196,7 @@ export const api = {
   searchEtfs: (q: string, signal?: AbortSignal) => getJson<Fund[]>(`/etfs/search?q=${encodeURIComponent(q)}&limit=20`, signal),
   portfolio: (id: string) => getJson<Portfolio>(`/portfolios/${encodeURIComponent(id)}`),
   portfolioAnalysis: (id: string) => getJson<PortfolioAnalysis>(`/portfolios/${encodeURIComponent(id)}/analysis`),
+  previewPortfolio: (id: string | null, body: PortfolioInput) => sendJson<PortfolioAnalysis>(id ? `/portfolios/${encodeURIComponent(id)}/preview` : "/portfolios/preview", "POST", body),
   createPortfolio: (body: PortfolioInput) => sendJson<PortfolioCreated>("/portfolios", "POST", body),
   updatePortfolio: (id: string, key: string, body: PortfolioInput) => sendJson<Portfolio>(`/portfolios/${encodeURIComponent(id)}`, "PUT", body, key),
   deletePortfolio: (id: string, key: string) => sendJson<void>(`/portfolios/${encodeURIComponent(id)}`, "DELETE", undefined, key),
@@ -185,6 +209,8 @@ export const api = {
     ),
   holdings: (ticker: string, date: string, signal?: AbortSignal) =>
     getJson<Holdings>(`/funds/${encodeURIComponent(ticker)}/holdings?date=${date}`, signal),
+  simulate: (ticker: string, date: string, body: SimulationRequest) =>
+    sendJson<SimulationResult>(`/funds/${encodeURIComponent(ticker)}/simulate?date=${date}`, "POST", body),
 };
 
 export const apiDocsUrl = `${API_URL}/docs`;

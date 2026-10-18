@@ -5,8 +5,9 @@ import { useMemo, useState } from "react";
 
 import type { Changes, Snapshot } from "@/lib/api";
 import { holdingsUrl } from "@/lib/api";
+import { downloadComparisonReport } from "@/lib/export";
 import { pp } from "@/lib/format";
-import { pickFund, pickRange, useChanges, useFunds, useQueryState, useSnapshots } from "@/lib/hooks";
+import { pickFund, pickRange, useChanges, useFund, useFunds, useQueryState, useSnapshots } from "@/lib/hooks";
 import { STATUS, tone } from "@/lib/labels";
 
 import CaveatsBanner from "../CaveatsBanner";
@@ -90,8 +91,11 @@ function ChangedPositions({ data, onSelect }: { data: Changes; onSelect: (id: st
 export default function TerminalDesk() {
   const query = useQueryState();
   const funds = useFunds();
-  const fundList = funds.data ?? [];
-  const fund = pickFund(fundList, query.get("fund"));
+  const requested = query.get("fund")?.toUpperCase() ?? "DEMO";
+  const directFund = useFund(requested);
+  const fundList = [...(funds.data ?? [])];
+  if (directFund.data && !fundList.some((item) => item.ticker === directFund.data!.ticker)) fundList.push(directFund.data);
+  const fund = pickFund(fundList, requested);
   const snapshots = useSnapshots(fund || null);
   const snapList = snapshots.data ?? [];
   const range = pickRange(snapList, query.get("from"), query.get("to"));
@@ -177,6 +181,7 @@ export default function TerminalDesk() {
           </FundSelector>
         </div>
         <div className="space-y-1.5 border-t border-line p-2">
+          <button type="button" disabled={!data} onClick={() => data && downloadComparisonReport(data)} className="block w-full rounded border border-line bg-panel-2 py-1.5 text-center text-sm hover:bg-panel-3 disabled:cursor-not-allowed disabled:opacity-40">Export comparison report</button>
           {data && (
             <details className="group rounded border border-line bg-panel-2 px-2 py-1.5 text-sm">
               <summary className="flex cursor-pointer list-none items-center justify-between">

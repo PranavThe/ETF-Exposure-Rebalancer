@@ -135,3 +135,61 @@ class Changes(BaseModel):
     holdings: list[HoldingChange]
     events: list[Event]
     caveats: list[str]
+
+
+class SimulationRequest(BaseModel):
+    """Target equity weights, keyed by security_id; values are fractions summing to 1."""
+
+    target_weights: dict[str, float]
+
+
+class SimulationSectorWeight(BaseModel):
+    sector: str
+    weight: float
+
+
+class SimulationProfile(BaseModel):
+    top_n: int
+    top_n_share: float
+    hhi: float
+    largest_holding_weight: float
+    largest_sector: str | None
+    largest_sector_weight: float
+    sectors: list[SimulationSectorWeight]
+
+
+class SimulationChange(BaseModel):
+    top_n_share: float
+    hhi: float
+    largest_holding_weight: float
+    largest_sector_weight: float
+
+
+class SimulationHolding(BaseModel):
+    security_id: str
+    ticker: str
+    name: str
+    sector: str
+    weight_current: float
+    weight_target: float
+    weight_change: float
+
+
+class SimulationSectorChange(BaseModel):
+    sector: str
+    weight_current: float
+    weight_target: float
+    weight_change: float
+
+
+class SimulationOut(BaseModel):
+    fund: str
+    as_of_date: date
+    risk_scope: str
+    top_n: int
+    current: SimulationProfile
+    scenario: SimulationProfile
+    change: SimulationChange
+    holdings: list[SimulationHolding]
+    sectors: list[SimulationSectorChange]
+    caveats: list[str]

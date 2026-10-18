@@ -68,6 +68,7 @@ export default function DiscoverBoard() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("events");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [readiness, setReadiness] = useState<"all" | "ready" | "pending" | "empty">("all");
 
   const all = overviews.data ?? [];
   const issuers = issuersOf(all);
@@ -76,7 +77,11 @@ export default function DiscoverBoard() {
   const scoped = active === ALL ? all : all.filter((o) => o.fund.issuer === active);
   const q = query.trim().toLowerCase();
   const cards = sortOverviews(
-    scoped.filter((o) => !q || o.fund.ticker.toLowerCase().includes(q) || o.fund.name.toLowerCase().includes(q)),
+    scoped.filter((o) => {
+      const count = o.snapshots.length;
+      const readinessMatch = readiness === "all" || (readiness === "ready" ? count >= 2 : readiness === "pending" ? count === 1 : count === 0);
+      return readinessMatch && (!q || o.fund.ticker.toLowerCase().includes(q) || o.fund.name.toLowerCase().includes(q));
+    }),
     sort,
   );
 
@@ -138,6 +143,16 @@ export default function DiscoverBoard() {
             <span className="font-mono text-[11px] text-faint">
               {cards.length} fund{cards.length === 1 ? "" : "s"}
             </span>
+            <label className="relative flex h-8 items-center rounded-md border border-line bg-panel pl-2.5 text-sm hover:border-line-2">
+              <span className="mr-1.5 text-faint">Data</span>
+              <select value={readiness} onChange={(e) => setReadiness(e.target.value as typeof readiness)} aria-label="Filter funds by data readiness" className="h-full cursor-pointer appearance-none bg-transparent pr-7 text-fg focus:outline-none">
+                <option value="all" className="bg-panel-2">All</option>
+                <option value="ready" className="bg-panel-2">Comparison ready</option>
+                <option value="pending" className="bg-panel-2">One snapshot</option>
+                <option value="empty" className="bg-panel-2">No snapshots</option>
+              </select>
+              <span aria-hidden className="pointer-events-none absolute right-2.5 text-[10px] text-faint">▼</span>
+            </label>
             <div className="ml-auto flex items-center gap-2">
               <label className="relative flex h-8 items-center rounded-md border border-line bg-panel pl-2.5 text-sm hover:border-line-2">
                 <span className="mr-1.5 text-faint">Sort</span>
@@ -194,6 +209,10 @@ export default function DiscoverBoard() {
 
   return (
     <div className="mx-auto max-w-[1920px] px-4 pb-10 lg:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3">
+        <div><p className="text-sm font-semibold">See a complete example</p><p className="text-xs text-muted">DEMO includes multiple snapshots, sector mix, and position changes.</p></div>
+        <a href="/terminal?fund=DEMO&from=2026-10-01&to=2026-10-02" className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-canvas hover:opacity-90">Explore DEMO comparison →</a>
+      </div>
       <nav aria-label="Issuers" className="flex items-center justify-center gap-3 overflow-x-auto py-5 sm:gap-4 sm:py-6">
         {tabs.map((name, i) => (
           <Fragment key={name}>

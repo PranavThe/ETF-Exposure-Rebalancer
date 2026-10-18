@@ -7,10 +7,12 @@ from sqlalchemy.orm import Session
 from backend.analytics import config
 from backend.analytics.compare import compare_snapshots
 from backend.analytics.sectors import resolve_sector
+from backend.analytics.simulation import simulate_portfolio
 
 from ..db import get_session
 from ..models import Fund, Holding, SecuritySector, Snapshot
-from ..schemas import Changes, FundOut, HoldingsOut, SnapshotOut
+from ..schemas import (Changes, FundOut, HoldingsOut, SimulationOut, SimulationRequest,
+                       SnapshotOut)
 
 router = APIRouter(prefix="/funds")
 
@@ -129,3 +131,21 @@ def get_changes(ticker: str, from_date: date = Query(alias="from"), to_date: dat
         snapshot_intervals=intervals,
     )
     return {"fund": fund.ticker, "from": snapshot_meta(snap_from), "to": snapshot_meta(snap_to), **result}
+
+
+@router.post("/{ticker}/simulate", response_model=SimulationOut)
+def simulate_changes(ticker: str, request: SimulationRequest,
+                     as_of: date = Query(alias="date"), session: Session = Depends(get_session)):
+    """Return a concentration and sector profile for proposed equity weights."""
+    fund = fund_or_404(session, ticker)
+    snapshot = snapshot_or_404(session, fund, as_of)
+    try:
+        result = simulate_portfolio(
+            analytics_rows(holdings_of(session, snapshot)),
+            request.target_weights,
+            sector_map=sector_map(session),
+            top_n=config.top_n_for(fund.ticker),
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"fund": fund.ticker, "as_of_date": snapshot.as_of_date, **result}

@@ -131,8 +131,14 @@ def delete_portfolio(
 @router.get("/{portfolio_id}/latest", response_model=PortfolioLatest)
 def latest_portfolio_data(portfolio_id: str, session: Session = Depends(get_session)):
     portfolio = portfolio_or_404(session, portfolio_id)
-    members = allocations(session, portfolio.id)
-    fund_ids = [fund.id for _, fund in members]
+    members = [(fund, allocation.weight) for allocation, fund in allocations(session, portfolio.id)]
+    return latest_for_members(session, portfolio_out(session, portfolio), members)
+
+
+def latest_for_members(session: Session, portfolio_data: dict,
+                       members: list[tuple[Fund, float]]) -> dict:
+    """Build the latest-holdings analysis input for stored or hypothetical allocations."""
+    fund_ids = [fund.id for fund, _ in members]
     snapshots_by_fund = {}
     holdings_by_snapshot = {}
     if fund_ids:
@@ -159,14 +165,14 @@ def latest_portfolio_data(portfolio_id: str, session: Session = Depends(get_sess
     sectors = sector_map(session)
     latest_funds = []
     coverage_weight = 0.0
-    for allocation, fund in members:
+    for fund, weight in members:
         snapshot = snapshots_by_fund.get(fund.id)
         holdings = holdings_by_snapshot.get(snapshot.id, []) if snapshot is not None else []
         if snapshot is not None:
-            coverage_weight += allocation.weight
+            coverage_weight += weight
         latest_funds.append({
             "ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer,
-            "weight": allocation.weight,
+            "weight": weight,
             "status": "available" if snapshot is not None else "missing",
             "as_of_date": snapshot.as_of_date if snapshot is not None else None,
             "snapshot": ({**snapshot_meta(snapshot), "ingested_at": snapshot.ingested_at}
@@ -180,10 +186,46 @@ def latest_portfolio_data(portfolio_id: str, session: Session = Depends(get_sess
                 for h in holdings
             ],
         })
-    return {"portfolio": portfolio_out(session, portfolio),
+    return {"portfolio": portfolio_data,
             "coverage_weight": coverage_weight, "funds": latest_funds}
 
 
 @router.get("/{portfolio_id}/analysis")
 def portfolio_analysis(portfolio_id: str, session: Session = Depends(get_session)):
     return analyze_latest(latest_portfolio_data(portfolio_id, session))
+
+
+@router.post("/preview")
+def preview_new_portfolio(body: PortfolioIn, session: Session = Depends(get_session)):
+    """Analyze a new hypothetical portfolio without persisting it."""
+    members = validated_funds(session, body)
+    preview_portfolio_data = {
+        "id": "preview",
+        "name": body.name.strip(),
+        "created_at": None,
+        "updated_at": None,
+        "funds": [
+            {"ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer, "weight": weight}
+            for fund, weight in members
+        ],
+    }
+    return analyze_latest(latest_for_members(session, preview_portfolio_data, members))
+
+
+@router.post("/{portfolio_id}/preview")
+def preview_portfolio(portfolio_id: str, body: PortfolioIn,
+                      session: Session = Depends(get_session)):
+    """Analyze hypothetical allocations without saving them to the portfolio."""
+    portfolio = portfolio_or_404(session, portfolio_id)
+    members = validated_funds(session, body)
+    preview_portfolio_data = {
+        "id": portfolio.id,
+        "name": body.name.strip(),
+        "created_at": portfolio.created_at,
+        "updated_at": portfolio.updated_at,
+        "funds": [
+            {"ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer, "weight": weight}
+            for fund, weight in members
+        ],
+    }
+    return analyze_latest(latest_for_members(session, preview_portfolio_data, members))
