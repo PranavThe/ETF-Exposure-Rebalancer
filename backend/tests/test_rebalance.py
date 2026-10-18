@@ -154,3 +154,18 @@ def test_suggestable_needs_the_allowlist_and_classified_holdings():
         "E": {},  # no data
     }
     assert suggestable(weights, {"A", "B", "C", "E"}) == {"A", "C"}
+
+
+def test_no_increase_funds_are_kept_or_reduced_never_increased():
+    # Holding T and H; H is the only way to add Health Care, but it may not receive more money,
+    # so the plans must bring in N (a mix of both) instead, and H never goes up.
+    weights = {"T": TECH, "H": HEALTH, "N": {"Technology": 0.5, "Health Care": 0.5}}
+    amounts = {"T": 8000, "H": 2000}
+    plans = build_plans(amounts, weights, {"Technology": 0.5, "Health Care": 0.5}, no_increase={"H"})
+    assert plans
+    for p in plans:
+        assert p.allocation.get("H", 0.0) <= 2000 + 1e-9
+    assert any("N" in p.new_funds for p in plans)
+    # Every held fund capped and nothing new allowed: no way to change anything.
+    assert build_plans(amounts, weights, {"Technology": 0.5, "Health Care": 0.5}, max_new_funds=0,
+                       no_increase={"T", "H"}) == []

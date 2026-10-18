@@ -231,16 +231,20 @@ def test_only_allowlisted_well_classified_funds_are_suggested(client, allow):
     assert all(m["ticker"] in {"TECHX", "BLENDX"} for p in body["plans"] for m in p["moves"])
 
 
-def test_held_funds_off_the_allowlist_still_count(client, allow):
+def test_held_funds_off_the_allowlist_count_but_never_get_more_money(client, allow):
     add_fund("TECHX", {"Information Technology": 100})
     add_fund("HLTHX", {"Health Care": 100})
-    allow()  # nothing may be suggested
-    body = client.post("/plan", json={
+    request = {
         "holdings": [{"ticker": "TECHX", "amount": 8000}, {"ticker": "HLTHX", "amount": 2000}],
         "target": {"Technology": 50, "Health Care": 50},
-    }).json()
+    }
+    allow()  # nothing is on the list: both still count, but neither may receive more money
+    body = client.post("/plan", json=request).json()
     assert mix(body["current"]) == {"Technology": 0.8, "Health Care": 0.2}
-    [plan] = body["plans"]
+    assert body["plans"] == []
+
+    allow("HLTHX")
+    [plan] = client.post("/plan", json=request).json()["plans"]
     assert plan["kind"] == "rearrange" and plan["new_funds"] == []
     assert [(m["ticker"], m["action"], m["amount"]) for m in plan["moves"]] == [
         ("TECHX", "reduce", 3000), ("HLTHX", "increase", 3000)]

@@ -77,8 +77,10 @@ differences.
   Whatever is left shows as "Unclassified".
 - **Suggested ETFs** come only from a short allowlist of plain, liquid index ETFs
   (`SUGGESTABLE_ETFS` in `rebalance.py`) whose mix is at least 80% classified. You can hold any ETF;
-  it counts in your mix and can be increased or reduced, but leveraged, inverse, single-stock or
+  it counts in your mix, but leveraged, inverse, single-stock or
   obscure funds are never proposed. `GET /etfs/covered` lists the allowlisted ETFs with data.
+- **Held ETFs off that list** (thematic or active funds, for example) still count in your mix and can
+  be kept or reduced, but no plan puts more money into them.
 - **Your exposure** is the dollar-weighted blend of your ETFs' mixes. ETFs without holdings data are
   listed as `missing`, kept as they are, and left out of the mix and the moves.
 - **Distance** between two mixes is half the sum of absolute differences (0 = identical, 1 = no

@@ -293,7 +293,10 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
         # Held ETFs of any kind count; new ones come only from the allowlist, never sample funds.
         samples = {t for t, entry in universe.items() if entry[0].issuer == SAMPLE_ISSUER}
         never = set(weights) - (suggestable(weights, allow) - samples)
-        for p in build_plans(amounts, weights, target, body.cash_change, body.max_new_funds, never):
+        # Only plain, well-known ETFs get more money. Others you hold can be kept or reduced.
+        no_increase = {t for t in amounts if t not in allow or t in samples}
+        for p in build_plans(amounts, weights, target, body.cash_change, body.max_new_funds, never,
+                             no_increase):
             plans.append({
                 "kind": p.kind, "title": p.title, "summary": p.summary,
                 "total_before": p.total_before, "total_after": p.total_after, "distance": p.distance,

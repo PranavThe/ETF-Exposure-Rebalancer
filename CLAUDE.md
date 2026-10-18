@@ -27,7 +27,8 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
 - Pure planner: `backend/analytics/rebalance.py` (sector mixes, exposure, distance, the QP solver,
   plans). Its constants (`MIN_POSITION`, `MIN_GAIN`, `SHORTLIST_SIZE`) live there, and so do
   `SUGGESTABLE_ETFS` (the only ETFs a plan may add; users can hold any ETF) and `MIN_CLASSIFIED`
-  (a fund under 80% classified is never suggested). Routes read the list through the
+  (a fund under 80% classified is never suggested). Held ETFs off the list go in `no_increase`:
+  plans may keep or reduce them, never increase them. Routes read the list through the
   `suggestable_etfs` dependency; tests override it.
 - Planner sectors per holding: security_sectors table, then the issuer's label (`resolve_sector`),
   then the company name (`backend/analytics/names.py` over `data/reference/name_sectors.csv`), then

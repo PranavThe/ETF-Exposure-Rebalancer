@@ -226,8 +226,14 @@ export default function MethodologyPage() {
               </p>
               <Bullets>
                 <li>
-                  <Term>Shortlist.</Term> ETFs with holdings data that you don&apos;t hold are scored by how well their
-                  sector mix points toward what your portfolio is missing. The top 12 are the candidates.
+                  <Term>Shortlist.</Term> Only plain, widely held index and sector ETFs (from SPDR, Vanguard, iShares
+                  and similar) whose holdings are at least 80% classified can be suggested. Those you don&apos;t hold are
+                  scored by how well their sector mix points toward what your portfolio is missing; the top 12 are the
+                  candidates.
+                </li>
+                <li>
+                  <Term>Only plain ETFs get more money.</Term> An ETF you hold that isn&apos;t on that list, such as a
+                  thematic or active fund, still counts in your mix and can be kept or reduced, but no plan increases it.
                 </li>
                 <li>
                   <Term>Closest mix.</Term> For a set of ETFs, {BRAND} finds the split of your money whose mix is

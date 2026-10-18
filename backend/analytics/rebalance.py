@@ -310,11 +310,16 @@ def _shares(
     total_after: float,
     floor_current: bool,
     cap_current: bool,
-) -> dict[str, float]:
+    no_increase: frozenset[str] = frozenset(),
+) -> dict[str, float] | None:
+    """Shares of `active` closest to the target, or None when the bounds leave no way to sum to 1."""
     anchor = [amounts.get(t, 0.0) / total_after for t in active]
-    # Add-only plans keep every ETF at least where it is; reduce-only plans cap it there.
+    # Add-only plans keep every ETF at least where it is; reduce-only plans cap it there, and ETFs in
+    # `no_increase` are always capped there.
     lo = anchor if floor_current else [0.0] * len(active)
-    hi = anchor if cap_current else [1.0] * len(active)
+    hi = [a if cap_current or t in no_increase else 1.0 for t, a in zip(active, anchor)]
+    if math.fsum(lo) > 1 + 1e-9 or math.fsum(hi) < 1 - 1e-9:
+        return None
     return dict(zip(active, solve_mix([weights[t] for t in active], target, anchor, lo, hi)))
 
 
@@ -327,14 +332,15 @@ def _pick_new(
     total_after: float,
     floor_current: bool,
     max_new: int,
+    no_increase: frozenset[str] = frozenset(),
 ) -> list[str]:
     """Up to `max_new` ETFs from `pool`, added one at a time, each the one that helps most.
 
     An ETF is only added if it brings the plan at least MIN_GAIN closer to the target.
     """
     def fit(tickers: list[str]) -> float:
-        share = _shares(tickers, amounts, weights, target, total_after, floor_current, False)
-        return distance(exposure(share, weights), target)
+        share = _shares(tickers, amounts, weights, target, total_after, floor_current, False, no_increase)
+        return math.inf if share is None else distance(exposure(share, weights), target)
 
     chosen: list[str] = []
     best = fit(base) if base else math.inf
@@ -359,18 +365,23 @@ def _allocate(
     floor_current: bool,
     cap_current: bool,
     max_new: int,
+    no_increase: frozenset[str] = frozenset(),
 ) -> dict[str, float]:
     """Dollar allocation over `candidates` totalling `total_after`, after pruning tiny positions."""
     held = {t for t, a in amounts.items() if a > 0}
     base = [t for t in candidates if t in held]
     pool = [t for t in candidates if t not in held]
-    active = base + (_pick_new(base, pool, amounts, weights, target, total_after, floor_current, max_new)
+    active = base + (_pick_new(base, pool, amounts, weights, target, total_after, floor_current, max_new,
+                               no_increase)
                      if pool and max_new > 0 else [])
     share: dict[str, float] = {}
     for _ in range(len(candidates) + 1):
         if not active:
             return {}
-        share = _shares(active, amounts, weights, target, total_after, floor_current, cap_current)
+        solved = _shares(active, amounts, weights, target, total_after, floor_current, cap_current, no_increase)
+        if solved is None:
+            return {}
+        share = solved
         drop = {t for t in active if t not in held and share[t] < MIN_POSITION}
         if not floor_current and not cap_current:
             # Held ETFs that would end up tiny are removed outright rather than left as dust.
@@ -420,12 +431,14 @@ def build_plans(
     cash_change: float = 0.0,
     max_new_funds: int = 2,
     never_suggest: Iterable[str] = (),
+    no_increase: Iterable[str] = (),
 ) -> list[Plan]:
     """Up to two plans toward `target`.
 
     `amounts` are the dollars in each ETF the user holds; `weights` are sector mixes for every ETF
     with holdings data; `cash_change` is money the user adds (positive) or takes out (negative).
     ETFs in `never_suggest` (e.g. test fixtures) can be held but are never proposed as new.
+    ETFs in `no_increase` can be kept or reduced but never get more money.
     Held ETFs without data are kept as they are and left out of exposure.
     """
     target = normalize_target(target)
@@ -464,7 +477,7 @@ def build_plans(
         if not candidates:
             continue
         raw = _allocate(covered, weights, target, candidates, total_after,
-                        floor_current, cap_current, max_new)
+                        floor_current, cap_current, max_new, frozenset(no_increase))
         if not raw:
             continue
         allocation = _round(raw, covered, total_after)
