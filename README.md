@@ -33,9 +33,9 @@ Your holdings, sector sliders, suggested moves, and Scythe, the assistant, share
 
 ## Use Glean
 
-Open **[the planner](https://etf-exposure-rebalancer.vercel.app/app)** in your browser. The
-[landing page](https://etf-exposure-rebalancer.vercel.app/),
-[methodology](https://etf-exposure-rebalancer.vercel.app/methodology), and
+Open **[the planner](https://glean-etf.vercel.app/)** in your browser. The
+[landing page](https://glean-etf.vercel.app/),
+[methodology](https://glean-etf.vercel.app/methodology), and
 [interactive API docs](https://fundshift-api.vercel.app/docs) are hosted too. No installation is
 needed to use the product.
 
