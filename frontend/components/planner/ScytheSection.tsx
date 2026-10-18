@@ -20,11 +20,13 @@ function Avatar() {
 export default function ScytheSection({
   turns,
   busy,
+  waiting = false,
   onSend,
   connected,
 }: {
   turns: (ChatTurn & { note?: string })[];
   busy: boolean;
+  waiting?: boolean; // the mix is still loading, so Scythe can't read it yet
   onSend: (message: string) => void;
   connected: boolean | null;
 }) {
@@ -38,7 +40,7 @@ export default function ScytheSection({
 
   function send(message: string) {
     const m = message.trim();
-    if (!m || busy) return;
+    if (!m || busy || waiting) return;
     onSend(m);
     setText("");
   }
@@ -127,7 +129,7 @@ export default function ScytheSection({
           />
           <button
             type="submit"
-            disabled={busy || !text.trim()}
+            disabled={busy || waiting || !text.trim()}
             aria-label="Send"
             className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-strong text-white transition-all hover:bg-accent hover:text-canvas active:scale-95 disabled:bg-panel-3 disabled:text-faint"
           >

@@ -374,7 +374,8 @@ export default function PlannerApp() {
             />
           </div>
         </div>
-        <ScytheSection turns={turns} busy={chatBusy} onSend={sendChat} connected={connected} />
+        {/* Scythe waits until the mix is loaded, so it reads your real mix rather than an empty one. */}
+        <ScytheSection turns={turns} busy={chatBusy} waiting={holdings.length > 0 && !result} onSend={sendChat} connected={connected} />
       </main>
       <StatusBar />
       <Toasts toasts={toasts} />
