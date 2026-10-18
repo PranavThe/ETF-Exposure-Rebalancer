@@ -67,7 +67,7 @@ export default function SiteFooter() {
           aria-hidden
           className="site-fade-text pb-[0.1em] text-[clamp(48px,7.6vw,150px)] leading-[0.95] font-light tracking-[-0.045em]"
         >
-          Holdings, decomposed.
+          Your mix, your call.
         </p>
       </div>
       <Ruler />

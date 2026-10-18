@@ -20,7 +20,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: BRAND,
-  description: "How an active ETF's portfolio changed: price movement versus portfolio activity.",
+  description: "See the sector mix inside the ETFs you own, choose the mix you want, and get the moves that get you there.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,141 @@
+"use client";
+
+import Panel from "@/components/ui/Panel";
+import type { ProviderHoldingChanges, ProviderPrice } from "@/lib/api";
+import { pct } from "@/lib/format";
+import { usd, type CoveredEtf, type Holding, type PlanFund } from "@/lib/planner";
+
+import AmountInput from "./AmountInput";
+import EtfPicker from "./EtfPicker";
+
+/** Left column: the ETFs the user holds and the dollars in each. */
+export default function HoldingsPanel({
+  holdings,
+  funds,
+  covered,
+  providerData,
+  prices,
+  onAmount,
+  onRemove,
+  onAdd,
+  onExample,
+}: {
+  holdings: Holding[];
+  funds: Map<string, PlanFund>;
+  covered: CoveredEtf[];
+  providerData: Map<string, ProviderHoldingChanges>;
+  prices: Map<string, ProviderPrice>;
+  onAmount: (ticker: string, amount: number) => void;
+  onRemove: (ticker: string) => void;
+  onAdd: (etf: { ticker: string; name: string }) => void;
+  onExample: () => void;
+}) {
+  const total = holdings.reduce((a, h) => a + h.amount, 0);
+  const missing = holdings.filter((h) => funds.get(h.ticker)?.status === "missing");
+  const missingTotal = missing.reduce((a, h) => a + h.amount, 0);
+
+  return (
+    <Panel
+      tabs={[{ id: "etfs", label: "Your ETFs", count: holdings.length }]}
+      active="etfs"
+      className="lg:h-full"
+      bodyClassName="flex flex-col"
+    >
+      <div className="border-b border-line px-4 py-3">
+        <p className="label">Total value</p>
+        <p className="mt-1 font-mono text-2xl tabular-nums text-fg">{usd(total)}</p>
+      </div>
+
+      <div className="px-3 pt-3">
+        <EtfPicker covered={covered} exclude={new Set(holdings.map((h) => h.ticker))} onPick={onAdd} />
+      </div>
+
+      {holdings.length === 0 ? (
+        <div className="px-4 py-5 text-sm text-muted">
+          <p>Add the ETFs you own and how much is in each. Your sector mix appears in the middle.</p>
+          <button
+            type="button"
+            onClick={onExample}
+            className="mt-3 rounded-md border border-line-2 px-3 py-1.5 text-sm text-fg hover:border-accent-strong hover:text-accent"
+          >
+            Try an example portfolio
+          </button>
+        </div>
+      ) : (
+        <ul className="mt-2 divide-y divide-line">
+          {holdings.map((h) => {
+            const fund = funds.get(h.ticker);
+            const noData = fund?.status === "missing";
+            const provider = providerData.get(h.ticker);
+            return (
+              <li key={h.ticker} className="px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-semibold">{h.ticker}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted" title={h.name}>{h.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(h.ticker)}
+                    aria-label={`Remove ${h.ticker}`}
+                    className="rounded px-1 text-faint hover:text-down"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <AmountInput value={h.amount} onValue={(v) => onAmount(h.ticker, v)} label={`Dollars in ${h.ticker}`} className="flex-1" />
+                  <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
+                    {total > 0 ? pct(h.amount / total, 0) : "–"}
+                  </span>
+                </div>
+                {noData && (
+                  <p className="mt-1 text-[11px] text-faint">No holdings data yet, so it isn’t counted in your mix.</p>
+                )}
+                {fund?.as_of_date && (
+                  <p className="mt-1 font-mono text-[10px] text-faint">
+                    {fund.source_provider === "tickerinside" ? "TickerInside" : fund.source_provider === "sec" ? "SEC N-PORT" : "Issuer file"}
+                    {fund.source_layer ? ` · ${fund.source_layer}` : ""} · holdings as of {fund.as_of_date}
+                  </p>
+                )}
+                {provider && (
+                  <details className="mt-1.5 rounded border border-line px-2 py-1.5 text-[10px] text-muted">
+                    <summary className="cursor-pointer">
+                      TickerInside holdings · {provider.snapshot.as_of_date}
+                      {provider.previous_as_of_date && ` · ${provider.no_longer_reported.length} no longer reported`}
+                    </summary>
+                    <ul className="mt-1.5 space-y-1">
+                      {provider.holdings.slice(0, 5).map((item) => {
+                        const price = prices.get(item.ticker);
+                        return (
+                          <li key={item.ticker} className="flex justify-between gap-2 font-mono">
+                            <span>{item.ticker} · {pct(item.weight, 1)}</span>
+                            <span className="text-faint">
+                              {price ? `$${price.close.toFixed(2)} · IEX ${price.as_of_date}` : "IEX price pending"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {provider.no_longer_reported.length > 0 && (
+                      <p className="mt-1.5">
+                        No longer reported: {provider.no_longer_reported.slice(0, 5).map((item) => item.ticker).join(", ")}
+                        {provider.no_longer_reported.length > 5 ? " …" : ""}. A reporting change does not prove a sale.
+                      </p>
+                    )}
+                    <p className="mt-1.5">TickerInside reports weights; Alpaca prices use the IEX feed. Reporting differences do not prove trades.</p>
+                  </details>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {missing.length > 0 && (
+        <p className="mt-auto border-t border-line px-4 py-2.5 text-xs text-muted">
+          {usd(missingTotal)} in {missing.map((m) => m.ticker).join(", ")} is kept out of the mix and the moves until
+          its holdings are loaded.
+        </p>
+      )}
+    </Panel>
+  );
+}

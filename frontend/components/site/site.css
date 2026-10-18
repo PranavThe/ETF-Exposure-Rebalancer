@@ -4,54 +4,6 @@
   collides with the app. Colours are literal hex values that mirror globals.css tokens.
 */
 
-/* Hero: diverging bars that slowly grow and shrink from a shared zero axis. */
-@keyframes site-drift {
-  0%,
-  100% {
-    transform: scaleX(var(--from, 0.6));
-  }
-  50% {
-    transform: scaleX(var(--to, 1));
-  }
-}
-.site-drift {
-  transform-box: view-box;
-  animation: site-drift var(--dur, 12s) ease-in-out var(--delay, 0s) infinite;
-}
-
-/* Hero: a faint highlight band that sweeps down the bar field. */
-@keyframes site-scan {
-  from {
-    transform: translateY(-60%);
-  }
-  to {
-    transform: translateY(60%);
-  }
-}
-.site-scan {
-  background-image: linear-gradient(
-    180deg,
-    transparent 44%,
-    rgba(166, 161, 255, 0.07) 50%,
-    transparent 56%
-  );
-  animation: site-scan 11s linear infinite;
-}
-
-/* A soft pulse for the glowing dots on the pipeline diagram's output pipe. */
-@keyframes site-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-.site-pulse {
-  animation: site-pulse 2.4s ease-in-out infinite;
-}
-
 /* Headline gradient: white into lavender. */
 .site-gradient-text {
   background-image: linear-gradient(100deg, #ffffff 0%, #ecebff 38%, #b9b5ff 100%);
@@ -68,7 +20,7 @@
   color: transparent;
 }
 
-/* Dotted fill used inside the pipeline's API box and the hero backdrop. */
+/* Dotted fill used behind the methodology page header. */
 .site-dots {
   background-image: radial-gradient(rgba(236, 236, 241, 0.09) 1px, transparent 1px);
   background-size: 14px 14px;
@@ -130,14 +82,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .site-drift,
-  .site-scan,
-  .site-pulse {
-    animation: none;
-  }
-  .site-scan {
-    display: none;
-  }
   .site-reveal[data-reveal] {
     opacity: 1;
     transform: none;

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from backend.pipeline.reference import sync_reference
 
 from .db import get_engine, init_db
-from .routes import etfs, funds, health, portfolios, provider_data
+from .routes import chat, etfs, funds, health, plans, portfolios, provider_data
 
 LOCAL_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
@@ -50,3 +50,5 @@ app.include_router(funds.router)
 app.include_router(portfolios.router)
 app.include_router(etfs.router)
 app.include_router(provider_data.router)
+app.include_router(plans.router)
+app.include_router(chat.router)
