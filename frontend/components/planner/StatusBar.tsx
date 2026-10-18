@@ -19,7 +19,7 @@ function Clock() {
 }
 
 /** Kairos-style bottom bar: data status, the disclaimer, clock and links. */
-export default function StatusBar({ etfsWithData }: { etfsWithData: number }) {
+export default function StatusBar() {
   const health = useHealth();
   const online = health.data?.status === "ok";
   return (
@@ -28,9 +28,9 @@ export default function StatusBar({ etfsWithData }: { etfsWithData: number }) {
         <span className={`h-1.5 w-1.5 rounded-full ${health.loading ? "bg-faint" : online ? "live-dot bg-up" : "bg-down"}`} />
         {health.loading ? "Connecting" : online ? "Live" : "Offline"}
       </span>
-      {etfsWithData > 0 && (
+      {health.data && (
         <span className="hidden h-full items-center gap-1.5 border-r border-line px-4 sm:flex">
-          ETFs with sector data <span className="font-mono text-fg">[{etfsWithData.toLocaleString()}]</span>
+          ETFs searchable <span className="font-mono text-fg">[{health.data.fund_count.toLocaleString()}]</span>
         </span>
       )}
       <span className="min-w-0 flex-1 truncate px-3 text-center text-faint">Derived from issuer-published holdings snapshots. Not investment advice.</span>

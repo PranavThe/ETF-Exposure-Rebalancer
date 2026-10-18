@@ -396,7 +396,7 @@ export default function PlannerApp() {
           </div>
         </div>
       </main>
-      <StatusBar etfsWithData={covered.filter((c) => !c.sample).length} />
+      <StatusBar />
       <Toasts toasts={toasts} />
     </div>
   );
