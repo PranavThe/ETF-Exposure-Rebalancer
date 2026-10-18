@@ -126,7 +126,7 @@ def plan_rules(facts: dict) -> PlanExplanation:
     consider = []
     if any(m["action"] in ("reduce", "remove") for m in facts["moves"]):
         consider.append("Reducing a fund in a taxable account can mean paying tax on any gain. The plan doesn't "
-                        "include taxes or trading costs.")
+                        "include taxes or transaction costs.")
     fee = facts.get("fees")
     if fee and fee["known_share"] > 0:
         consider.append(f"Yearly fund fees go from about {_money(fee['before'])} to {_money(fee['after'])}"

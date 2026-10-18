@@ -104,7 +104,7 @@ def latest_provider_holdings(ticker: str, session: Session = Depends(get_session
                              "change": current_rows[symbol] - previous_rows[symbol]}
                             for symbol in sorted(current_tickers & previous_tickers)
                             if current_rows[symbol] != previous_rows[symbol]],
-        "change_note": "Snapshot differences indicate reporting changes; they do not prove trades.",
+        "change_note": "Snapshot differences indicate reporting changes; they do not prove portfolio activity.",
     }
 
 

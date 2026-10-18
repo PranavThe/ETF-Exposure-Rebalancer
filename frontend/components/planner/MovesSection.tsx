@@ -165,7 +165,7 @@ export default function MovesSection({
         {plan && (
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px] text-muted">
             {plan.fee_known_after > 0 && (
-              <span title="Yearly fund fees (expense ratios from each fund's SEC filing), for the funds whose fee we have. Trading costs and taxes aren't included.">
+              <span title="Yearly fund fees (expense ratios from each fund's SEC filing), for the funds whose fee we have. Transaction costs and taxes aren't included.">
                 Yearly fund fees{" "}
                 <span className="font-mono text-fg/90">
                   {usd(plan.fee_before)} → {usd(plan.fee_after)}
@@ -276,8 +276,8 @@ function BeforeYouAct({ dataDates }: { dataDates: string | null }) {
           accounts work differently. Plans ignore taxes.
         </li>
         <li>
-          <span className="text-fg/90">Costs.</span> Yearly fund fees come from each fund&apos;s SEC filing. Trading spreads
-          and commissions aren&apos;t included.
+          <span className="text-fg/90">Costs.</span> Yearly fund fees come from each fund&apos;s SEC filing. Spreads and
+          commissions when you move money aren&apos;t included.
         </li>
         <li>
           <span className="text-fg/90">Dated data.</span> Holdings come from filings{dataDates ? ` dated ${dataDates}` : ""}.

@@ -432,3 +432,26 @@ def test_explanations_from_rules_and_from_gemini(client, allow):
     finally:
         app.dependency_overrides.pop(llm.get_client, None)
         explain._cache.clear()
+
+
+def test_template_explanations_follow_the_language_rules(client, allow):
+    import re
+
+    from backend.app import llm
+    from backend.app.main import app
+
+    allow("TECHX", "HLTHX")
+    add_fund("TECHX", {"Information Technology": 100})
+    add_fund("HLTHX", {"Health Care": 100})
+    banned = re.compile(r"\b(bought|sold|buy|buys|buying|sell|sells|selling|trade|trades|trading|believes|thinks)\b", re.I)
+    app.dependency_overrides[llm.get_client] = lambda: None
+    try:
+        body = client.post("/explain/plan", json={
+            "holdings": [{"ticker": "TECHX", "amount": 10000}], "target": {"Technology": 0.5, "Health Care": 0.5},
+            "max_new_funds": 1, "kind": "rearrange_with_new"}).json()
+        text = " ".join([body["summary"], *[m["why"] for m in body["moves"]], *body["consider"]])
+        assert not banned.search(text), banned.search(text)
+        etf = client.post("/explain/etf", json={"ticker": "TECHX"}).json()
+        assert not banned.search(etf["summary"] + " ".join(etf["points"]))
+    finally:
+        app.dependency_overrides.pop(llm.get_client, None)
