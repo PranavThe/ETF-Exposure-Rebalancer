@@ -174,11 +174,11 @@ export default function HoldingsSection({
   logo?: (ticker: string, name: string) => React.ReactNode;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  // Rows opened at least once keep their details mounted, so closing can animate too.
-  const [seen, setSeen] = useState<Set<string>>(() => new Set());
+  // A row that is closing keeps its details until the height animation ends, then lets them go.
+  const [closing, setClosing] = useState<string | null>(null);
   const toggle = (ticker: string) => {
+    setClosing(open);
     setOpen(open === ticker ? null : ticker);
-    setSeen((s) => (s.has(ticker) ? s : new Set(s).add(ticker)));
   };
   const total = holdings.reduce((a, h) => a + h.amount, 0);
 
@@ -271,9 +271,14 @@ export default function HoldingsSection({
                       </div>
                     </div>
                   </div>
-                  <div className="disclose" data-open={expanded} inert={!expanded}>
+                  <div
+                    className="disclose"
+                    data-open={expanded}
+                    inert={!expanded}
+                    onTransitionEnd={(e) => e.target === e.currentTarget && closing === h.ticker && setClosing(null)}
+                  >
                     <div>
-                      {seen.has(h.ticker) && (
+                      {(expanded || closing === h.ticker) && (
                         <Details fund={fund} amount={h.amount} provider={providerData.get(h.ticker)} prices={prices} onRemove={() => onRemove(h.ticker)} />
                       )}
                     </div>
