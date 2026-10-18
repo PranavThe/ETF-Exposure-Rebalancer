@@ -149,8 +149,8 @@ export default function MethodologyPage() {
                 issuer&apos;s own sector column. If neither resolves it, the planner uses a company-name reference,
                 then the sector of the same security in another eligible ETF. Remaining gaps are
                 <Term>Unclassified</Term>. For TickerInside weights, the planner first uses a matching ticker&apos;s sector
-                from stored issuer/SEC equity holdings, then a ticker-sector reference; unknown symbols remain
-                unclassified. Issuers spell sectors differently, so known labels are mapped
+                from stored issuer/SEC equity holdings, then a ticker-sector reference, where a U.S. listing wins over a
+                foreign exchange code with the same letters; unknown symbols remain unclassified. Issuers spell sectors differently, so known labels are mapped
                 to standard sectors. Non-equity rows in issuer and SEC files, such as cash, money-market funds,
                 futures or warrants, go to <Term>Cash &amp; other</Term>.
               </p>
@@ -332,8 +332,9 @@ export default function MethodologyPage() {
                 ]}
               />
               <p>
-                Each ETF uses its latest stored issuer/SEC snapshot unless a TickerInside snapshot is strictly newer
-                or is the only available source. ETFs in one portfolio can have different dates, and sources are not
+                Each ETF uses its latest stored issuer/SEC snapshot unless a TickerInside snapshot is the only
+                available source, or is strictly newer and assigns a sector to as much of the fund (or at least 80% of
+                it). ETFs in one portfolio can have different dates, and sources are not
                 mixed inside one fund&apos;s selected snapshot. Issuer files describe the previous market day at best;
                 SEC filings can be older. When you add a fund, the app tries a bounded TickerInside lookup if none is
                 stored. ARK&apos;s file is read from:

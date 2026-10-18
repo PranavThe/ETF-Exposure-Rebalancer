@@ -35,8 +35,9 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   the sector the same security id has in an allowlisted fund. Rebuild the CSV with
   `scripts/build_name_sectors.py` from the gitignored `data/vendor/ishares/*.csv`. The name fallback
   is planner-only: `/funds/...` and the change analysis still use `resolve_sector` alone.
-- The planner selects a TickerInside snapshot only when it is newer than the latest issuer/SEC
-  snapshot or no issuer/SEC snapshot exists. The app attempts a bounded TickerInside lookup when
+- The planner selects a TickerInside snapshot only when no issuer/SEC snapshot exists, or when it is
+  newer and classifies as much of the fund (or at least `MIN_CLASSIFIED`). Ticker sectors from
+  `name_sectors.csv` prefer U.S. listings over foreign local codes (`NON_US_SOURCES` in `reference.py`). The app attempts a bounded TickerInside lookup when
   adding a fund with no provider snapshot. Stored Alpaca IEX prices come from the scheduled or
   manual sync, not from a browser request.
 - There are two plan types. Unchanged or duplicate results are omitted; any improvement to a
