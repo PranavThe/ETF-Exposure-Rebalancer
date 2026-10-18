@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 
 import { Crosshair } from "./Frame";
+import HeroSpray from "./HeroSpray";
 import { LAUNCH_APP } from "./links";
 
 const DATA_SOURCES = ["ARK Invest", "iShares", "SEC N-PORT filings"];
@@ -35,6 +36,7 @@ export default function Hero() {
       className="relative flex min-h-[max(620px,calc(100svh-105px))] flex-col overflow-hidden bg-[#050506]"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_70%_25%,rgba(122,115,240,0.14),transparent_48%),radial-gradient(ellipse_at_15%_80%,rgba(201,133,0,0.08),transparent_40%)]" />
+      <HeroSpray />
       <div className="relative flex flex-1 flex-col justify-end px-5 pt-40 pb-12 sm:px-8 sm:pb-14 lg:px-14">
         <h1
           id="hero-heading"
