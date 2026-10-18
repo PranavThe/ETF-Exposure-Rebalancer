@@ -1,8 +1,8 @@
 """Scythe, the assistant: turns what the user says into a target sector mix.
 
-It never chooses a mix for the user. Claude reads the message when ANTHROPIC_API_KEY is set; without
+It never chooses a mix for the user. Gemini reads the message when GEMINI_API_KEY is set; without
 a key a small rule-based reader handles plain requests ("less tech", "no energy", "30% health care").
-Weights are fractions (0.25 = 25%) everywhere except the percentages Claude writes, which are
+Weights are fractions (0.25 = 25%) everywhere except the percentages Gemini writes, which are
 converted on the way in.
 """
 
@@ -15,10 +15,10 @@ from pydantic import BaseModel, Field
 
 from backend.analytics.rebalance import CASH_OTHER, SECTORS, UNCLASSIFIED, canonical_sector, sector_order
 
-MODEL = "claude-haiku-5-5"
-# Models that accept the server-side refusal fallback (Haiku has none; a refusal just ends the reply).
-FALLBACK_MODELS = {"claude-sonnet-5-5", "claude-opus-5-5"}
+from .llm import generate_json
+
 TARGET_SECTORS = [s for s in SECTORS if s != UNCLASSIFIED]
+REAL_SECTORS = [s for s in TARGET_SECTORS if s != CASH_OTHER]
 Sector = Literal[
     "Technology", "Health Care", "Financials", "Consumer Discretionary", "Consumer Staples",
     "Communication Services", "Industrials", "Energy", "Utilities", "Materials", "Real Estate",
@@ -28,27 +28,38 @@ Sector = Literal[
 SYSTEM_PROMPT = f"""You are Scythe. You help a beginner investor set the sector mix they want for their
 ETF portfolio.
 
-The user decides what they want. Your only job is to turn their words into a target mix. Never
-suggest what mix they should want, never say whether a sector is a good or bad idea, and never
-predict markets. If they ask for advice, say kindly that the choice is theirs, and offer to explain
-what a sector contains. The plans always work with the money already in their ETFs; if they mention
-adding or taking out money, tell them to change that ETF's dollar amount in their holdings list, and
-leave the mix unchanged.
+The user decides what they want. Your only job is to read what they want changed in their target
+mix and fill in the fields below; the app does all the arithmetic. Never suggest what mix they
+should want, never say whether a sector is a good or bad idea, and never predict markets. If they
+ask for advice, say kindly that the choice is theirs, and offer to explain what a sector contains.
+The plans always work with the money already in their ETFs; if they mention adding or taking out
+money, tell them to change that ETF's dollar amount in their holdings list, and change nothing.
 
-Each turn you get their current mix (from the ETFs they hold), their current target if they set one,
-and their message. Start from the current target (or the current mix if there is none), change only
-what they asked for, and spread any difference over the other sectors in proportion to their size,
-so the total stays 100. "A bit" means about 3 percentage points, "more"/"less" about 5, "a lot"
-about 10. "No X" or "none" means 0.
+Each turn you get their current mix (from the ETFs they hold), their current target if they set
+one, and their message. Fields:
+- set: sectors given an exact percentage. "30% financials" -> Financials 30. "No energy" -> Energy 0.
+  "Make it 50/50 tech and utilities" -> Technology 50, Utilities 50. "Split evenly between tech,
+  health care and financials" -> 33.33 each. When the set sectors add up to 100, all others become 0.
+- adjust: changes in percentage points. "Less tech" -> Technology -5. "A bit more health care" -> +3.
+  "A lot more" -> +10. "Tech up 8 points" -> +8. "Move 10 points from tech to health care" ->
+  Technology -10, Health Care +10.
+- scale: multiples. "Cut tech in half" -> Technology 0.5. "Double utilities" -> Utilities 2.
+- cap_percent: a ceiling for every sector, as in "no more than 20% in any sector" -> 20. Otherwise 0.
+- equal: true only when they want every sector weighted equally.
+- reset: true when they want the target to go back to their current mix.
+The app spreads any difference over the sectors they didn't name, in proportion to their size.
+A follow-up like "a bit more" refers to the sector discussed just before. If the message changes
+nothing (a greeting, a question, advice, money), leave set, adjust and scale empty, cap_percent 0,
+equal and reset false.
 
 Sectors: {", ".join(TARGET_SECTORS)}. Map everyday words to these (tech -> Technology, banks ->
 Financials, oil -> Energy, REITs -> Real Estate, retail -> Consumer Discretionary, telecom or media
 -> Communication Services, food or household goods -> Consumer Staples, cash or bonds -> Cash & other).
 
-Reply in one or two short, plain sentences that say what changed, using percentages for weights and
-"pp" for differences. Never use the words "buy", "sell", "bought", "sold" or "trade"; say "add",
-"increase" or "reduce". If the message doesn't change the mix (a question, a greeting), answer
-briefly and set changed to false."""
+reply: one or two short, plain sentences saying in words what you changed, for example "I lowered
+Technology by 5 pp and raised Health Care by 5 pp." Don't state the resulting percentages: the app
+adds them. Use "pp" for differences. Never use the words "buy", "sell", "bought", "sold" or "trade";
+say "add", "increase" or "reduce"."""
 
 
 class SectorPercent(BaseModel):
@@ -56,18 +67,33 @@ class SectorPercent(BaseModel):
     percent: float
 
 
-class Reading(BaseModel):
-    """What Claude returns."""
+class SectorPoints(BaseModel):
+    sector: Sector
+    pp: float
+
+
+class SectorFactor(BaseModel):
+    sector: Sector
+    factor: float = Field(ge=0)
+
+
+class Intent(BaseModel):
+    """What Gemini reads from a message: the changes, never the resulting numbers."""
 
     reply: str
-    changed: bool = Field(description="True when this message changes the target mix")
-    target: list[SectorPercent] = Field(description="The full target mix in percent; empty if unchanged")
+    set: list[SectorPercent] = Field(default_factory=list)
+    adjust: list[SectorPoints] = Field(default_factory=list)
+    scale: list[SectorFactor] = Field(default_factory=list)
+    cap_percent: float = 0.0
+    equal: bool = False
+    reset: bool = False
 
 
 class AssistantResult(BaseModel):
     reply: str
     target: dict[str, float] | None  # fractions summing to 1; None when the message changes nothing
-    source: Literal["claude", "rules"]
+    source: Literal["gemini", "rules"]
+    model: str | None = None  # the Gemini model that answered
 
 
 def tidy(mix: dict[str, float]) -> dict[str, float] | None:
@@ -89,37 +115,95 @@ def _percent_list(mix: dict[str, float]) -> str:
                      if w > 0.0005) or "nothing yet"
 
 
-def ask_claude(client, message: str, history: list[dict], current: dict[str, float],
-               target: dict[str, float] | None, total: float, model: str = MODEL) -> AssistantResult:
-    """One Messages API call with a JSON-schema output; raises anthropic errors to the caller."""
+def ask_gemini(client, message: str, history: list[dict], current: dict[str, float],
+               target: dict[str, float] | None, total: float) -> AssistantResult:
+    """Gemini reads the request; apply_changes does the arithmetic. Raises llm.FAILURES."""
     state = (f"Current mix: {_percent_list(current)}.\n"
              f"Current target: {_percent_list(target) if target else 'not set'}.\n"
              f"Portfolio value: ${total:,.0f}.")
-    messages = [{"role": m["role"], "content": m["content"]} for m in history[-10:]]
-    messages.append({"role": "user", "content": [
-        {"type": "text", "text": state},
-        {"type": "text", "text": message},
-    ]})
-    request = dict(
-        model=model,
-        max_tokens=16000,
-        system=SYSTEM_PROMPT,
-        messages=messages,
-        output_config={"effort": "low", "format": {"type": "json_schema", "schema": READING_SCHEMA}},
-    )
-    if model in FALLBACK_MODELS:
-        response = client.beta.messages.create(**request, betas=["server-side-fallback-2026-07-01"],
-                                               fallbacks="default")
+    turns = [{"role": "model" if m["role"] == "assistant" else "user", "text": m["content"]}
+             for m in history[-10:]]
+    turns.append({"role": "user", "text": f"{state}\n\n{message}"})
+    data, model = generate_json(client, SYSTEM_PROMPT, turns, INTENT_SCHEMA)
+    intent = Intent.model_validate(data)
+    reply = plain_words(intent.reply.strip())
+    base = target or current
+    if intent.reset:
+        new = tidy(current)
+        named = list(new or {})
+    elif intent.equal:
+        new = {s: 1 / len(REAL_SECTORS) for s in REAL_SECTORS}
+        named = REAL_SECTORS
     else:
-        response = client.messages.create(**request)
-    if response.stop_reason == "refusal":
-        return AssistantResult(reply="I can't help with that one, but the sliders still work.",
-                               target=None, source="claude")
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    reading = Reading.model_validate(json.loads(text))
-    mix = tidy({p.sector: p.percent for p in reading.target}) if reading.changed else None
-    return AssistantResult(reply=plain_words(reading.reply.strip()), target=mix, source="claude")
+        fixed = {c.sector: c.percent / 100 for c in intent.set}
+        shifts = {c.sector: c.pp / 100 for c in intent.adjust}
+        scales = {c.sector: c.factor for c in intent.scale}
+        cap = intent.cap_percent / 100 if intent.cap_percent > 0 else None
+        new = apply_changes(base, fixed, shifts, scales, cap) if fixed or shifts or scales or cap else None
+        named = list(dict.fromkeys([*fixed, *shifts, *scales]))
+    if new is None or all(abs(new.get(s, 0.0) - base.get(s, 0.0)) < 1e-9 for s in set(new) | set(base)):
+        return AssistantResult(reply=reply, target=None, source="gemini", model=model)
+    summary = describe(base, new, named)
+    return AssistantResult(reply=f"{reply} {summary}".strip(), target=new, source="gemini", model=model)
 
+
+def _pct(w: float) -> str:
+    return f"{w * 100:.1f}".removesuffix(".0") + "%"
+
+
+def describe(base: dict[str, float], new: dict[str, float], named: list[str]) -> str:
+    """'Technology 52.6% → 47.6%, Health Care 8.4% → 13.4%.' for the sectors the change was about."""
+    moved = [s for s in named if abs(new.get(s, 0.0) - base.get(s, 0.0)) >= 0.0005]
+    if not moved:  # e.g. a cap: list the biggest moves instead
+        moved = sorted((s for s in set(new) | set(base) if abs(new.get(s, 0.0) - base.get(s, 0.0)) >= 0.0005),
+                       key=lambda s: -abs(new.get(s, 0.0) - base.get(s, 0.0)))[:3]
+    return ", ".join(f"{s} {_pct(base.get(s, 0.0))} → {_pct(new.get(s, 0.0))}" for s in moved[:6]) + "."
+
+
+def apply_changes(base: dict[str, float], fixed: dict[str, float] | None = None,
+                  shifts: dict[str, float] | None = None, scales: dict[str, float] | None = None,
+                  cap: float | None = None) -> dict[str, float] | None:
+    """The new target, from `base` (fractions): `fixed` sectors set outright, `shifts` moved by
+    that many points and `scales` multiplied, each kept within 0-100%. The sectors not named keep
+    their proportions of what is left; then no sector stays above `cap`. None if nothing is left."""
+    mix = {s: base.get(s, 0.0) for s in TARGET_SECTORS}
+    fixed = {s: min(max(w, 0.0), 1.0) for s, w in (fixed or {}).items()}
+    for sector, factor in (scales or {}).items():
+        fixed.setdefault(sector, min(mix[sector] * factor, 1.0))
+    for sector, step in (shifts or {}).items():
+        fixed.setdefault(sector, max(0.0, min(1.0, mix[sector] + step)))
+    pinned = math.fsum(fixed.values())
+    if pinned > 1 or pinned >= 0.995 and len(fixed) > 1:  # 33.33 x 3 means "all of it"
+        fixed = {s: w / pinned for s, w in fixed.items()}
+        pinned = 1.0
+    rest = {s: w for s, w in mix.items() if s not in fixed}
+    rest_total = math.fsum(rest.values())
+    target = dict(fixed)
+    for sector, weight in rest.items():
+        target[sector] = (1 - pinned) * weight / rest_total if rest_total > 0 else 0.0
+    if rest_total <= 0 and pinned < 1:
+        target = {s: w / pinned for s, w in fixed.items()} if pinned > 0 else {}
+    result = tidy(target)
+    if result is not None and cap is not None and cap * len(REAL_SECTORS) >= 1:
+        result = tidy(_capped(result, cap))
+    return result
+
+
+def _capped(mix: dict[str, float], cap: float) -> dict[str, float]:
+    """No sector above `cap`: the excess goes to the sectors under it, in proportion to their size
+    (evenly when they are all empty), repeated until nothing is over."""
+    out = {s: mix.get(s, 0.0) for s in REAL_SECTORS + [CASH_OTHER]}
+    for _ in range(len(out)):
+        excess = math.fsum(w - cap for w in out.values() if w > cap)
+        if excess <= 1e-12:
+            break
+        under = [s for s, w in out.items() if w < cap - 1e-12 and s in REAL_SECTORS]
+        room = math.fsum(out[s] for s in under)
+        for s in out:
+            out[s] = min(out[s], cap)
+        for s in under:
+            out[s] += excess * (out[s] / room if room > 0 else 1 / len(under))
+    return out
 
 
 # The UI never says buy, sell or trade, or what anyone believes or thinks (SPEC §9). The prompt asks
@@ -139,26 +223,39 @@ def plain_words(text: str) -> str:
                       text, flags=re.IGNORECASE)
     return text
 
-READING_SCHEMA = {
+INTENT_SCHEMA = {
     "type": "object",
     "properties": {
         "reply": {"type": "string"},
-        "changed": {"type": "boolean"},
-        "target": {
+        "set": {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {
-                    "sector": {"type": "string", "enum": TARGET_SECTORS},
-                    "percent": {"type": "number"},
-                },
+                "properties": {"sector": {"type": "string", "enum": TARGET_SECTORS}, "percent": {"type": "number"}},
                 "required": ["sector", "percent"],
-                "additionalProperties": False,
             },
         },
+        "adjust": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"sector": {"type": "string", "enum": TARGET_SECTORS}, "pp": {"type": "number"}},
+                "required": ["sector", "pp"],
+            },
+        },
+        "scale": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"sector": {"type": "string", "enum": TARGET_SECTORS}, "factor": {"type": "number"}},
+                "required": ["sector", "factor"],
+            },
+        },
+        "cap_percent": {"type": "number"},
+        "equal": {"type": "boolean"},
+        "reset": {"type": "boolean"},
     },
-    "required": ["reply", "changed", "target"],
-    "additionalProperties": False,
+    "required": ["reply", "set", "adjust", "scale", "cap_percent", "equal", "reset"],
 }
 
 
@@ -229,27 +326,12 @@ def rule_based(message: str, base: dict[str, float]) -> AssistantResult:
                    "\"no energy\" or \"30% financials\". The sliders work too."),
             target=None, source="rules")
 
-    mix = {s: base.get(s, 0.0) for s in TARGET_SECTORS}
-    for sector, step in shifts.items():
-        fixed.setdefault(sector, max(0.0, min(1.0, mix[sector] + step)))
-    pinned = math.fsum(fixed.values())
-    if pinned > 1:
-        fixed = {s: w / pinned for s, w in fixed.items()}
-        pinned = 1.0
-    rest = {s: w for s, w in mix.items() if s not in fixed}
-    rest_total = math.fsum(rest.values())
-    target = dict(fixed)
-    for sector, weight in rest.items():
-        target[sector] = (1 - pinned) * weight / rest_total if rest_total > 0 else 0.0
-    if rest_total <= 0 and pinned < 1:
-        target = {s: w / pinned for s, w in fixed.items()} if pinned > 0 else {}
-    mix_after = tidy(target)
+    mix_after = apply_changes(base, fixed, shifts)
     if mix_after is None:
         return AssistantResult(reply="That would leave nothing in any sector, so I left your target as it was.",
                                target=None, source="rules")
-    changes = [f"{s} {base.get(s, 0.0) * 100:.0f}% → {mix_after.get(s, 0.0) * 100:.0f}%" for s in fixed]
-    reply = "Done: " + ", ".join(changes) + "."
-    if rest_total > 0 and pinned < 1 and len(fixed) < len(TARGET_SECTORS):
+    reply = "Done: " + describe(base, mix_after, list(dict.fromkeys([*fixed, *shifts])))
+    if len(fixed) + len(shifts) < len(TARGET_SECTORS) and mix_after.keys() - fixed.keys() - shifts.keys():
         reply += " The other sectors were scaled so the total stays 100%."
     if money:
         reply += " Plans use the money already in your ETFs; change an amount in your holdings to add or take out money."

@@ -57,7 +57,8 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type ChatReply = {
   reply: string;
   target: Record<string, number> | null;
-  source: "claude" | "rules";
+  source: "gemini" | "rules";
+  model?: string | null; // the Gemini model that answered
 };
 
 export type Holding = { ticker: string; name: string; amount: number };

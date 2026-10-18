@@ -50,9 +50,10 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   `POST /chat` (`routes/chat.py`, `app/assistant.py`). Saved portfolios reuse the weights-based
   portfolio API; the dollar value and target live in `portfolio_preferences`.
 - Scythe (the assistant) only turns the user's words into a target mix; it never chooses one and never
-  adds or takes out money (plans always use the money already in the ETFs). It uses
-  `claude-haiku-5-5` (effort `low`, thinking on: off it gets the arithmetic wrong) when `ANTHROPIC_API_KEY`
-  is set, else the rule-based reader. Tests use a fake client.
+  adds or takes out money (plans always use the money already in the ETFs). With `GEMINI_API_KEY` it asks
+  Gemini (`backend/app/llm.py`: `gemini-3.5-flash`, then fallbacks when a model is rate-limited or busy)
+  for an intent (set/adjust/scale/cap/equal/reset); `apply_changes` does the arithmetic, never the model.
+  Without a key, the rule-based reader. Tests use a fake client; they never call Gemini.
 - Test funds with issuer "Synthetic" (DEMO, SPLT, FLOWTEST) are never suggested.
 
 ## Units (SPEC §4)

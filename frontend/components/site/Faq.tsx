@@ -23,7 +23,7 @@ const ITEMS = [
     title: "Does Scythe, the assistant, decide my mix?",
     body: (
       <p>
-        No. Scythe can use Claude or a basic reader to turn your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
+        No. Scythe uses Gemini, or a basic reader, to turn your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
         a target mix you can see and change. Ask it which sector is best and it will tell you the choice is yours. The
         sliders do everything without it.
       </p>

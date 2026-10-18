@@ -92,9 +92,10 @@ weight differences: 0 means identical mixes; 1 means no overlap.
   distance by at least 0.5 pp each. Any rearrangement that improves the match can be shown,
   even by less than 0.5 pp. The planner prunes small positions using a 1% threshold, rounds
   amounts to whole dollars, and omits unchanged or duplicate plans.
-- **Scythe, the assistant:** with `ANTHROPIC_API_KEY`, `/chat` uses the model configured in
-  [`backend/app/assistant.py`](backend/app/assistant.py). Without a key, or when a supported API
-  error occurs, a rule-based reader handles requests such as “less tech,” “no energy,” or
+- **Scythe, the assistant:** with `GEMINI_API_KEY`, `/chat` asks Gemini (models in
+  [`backend/app/llm.py`](backend/app/llm.py), tried in order when one is busy) what the user wants
+  changed, and Glean's code computes the new mix. Without a key, or when every model fails, a
+  rule-based reader handles requests such as “less tech,” “no energy,” or
   “30% financials.” Scythe changes the target mix only; requests to add or withdraw money prompt
   you to edit your holdings. Sliders work independently of the assistant.
 
@@ -249,7 +250,8 @@ The hosted services configure their own environment; these variables are for dev
 | `NEXT_PUBLIC_API_URL` | Frontend | `http://localhost:8000`; baked into the frontend build |
 | `CORS_ORIGINS` | API | Comma-separated additional frontend origins; localhost and 127.0.0.1 on port 3000 are already allowed |
 | `CORS_ORIGIN_REGEX` | API | Optional pattern for origins that vary across deployments |
-| `ANTHROPIC_API_KEY` | API | Optional Claude support for Scythe; omitted by default |
+| `GEMINI_API_KEY` | API | Optional Gemini support for Scythe and the explanations; omitted by default |
+| `GEMINI_MODEL` | API | Optional first Gemini model to try; defaults to `gemini-3.5-flash` |
 | `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY` | Provider sync | Optional credentials for importing Alpaca IEX prices |
 | `SEC_USER_AGENT` | SEC download script | Contact identification for SEC downloads; see the data-source guide |
 

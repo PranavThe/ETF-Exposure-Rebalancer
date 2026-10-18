@@ -345,7 +345,7 @@ export default function PlannerApp() {
         setTarget(reply.target);
         setTouched(new Set());
       }
-      setConnected(reply.source === "claude");
+      setConnected(reply.source === "gemini");
       setTurns((t) => [
         ...t,
         { role: "assistant", content: reply.reply, note: reply.source === "rules" ? "simple reader (AI not connected)" : undefined },

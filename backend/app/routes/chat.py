@@ -1,16 +1,13 @@
 """POST /chat: the assistant that turns the user's words into a target sector mix."""
 
-import json
 import logging
-import os
 from typing import Literal
 
-import anthropic
-import pydantic
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..assistant import AssistantResult, ask_claude, rule_based, tidy
+from .. import llm
+from ..assistant import AssistantResult, ask_gemini, rule_based, tidy
 from ..plan_schemas import _finite_non_negative
 
 router = APIRouter(tags=["planner"])
@@ -35,22 +32,15 @@ class ChatIn(BaseModel):
     _check_target = field_validator("target")(_finite_non_negative)
 
 
-def get_client():
-    """An Anthropic client when ANTHROPIC_API_KEY is set; otherwise None and the rule-based reader."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return None
-    return anthropic.Anthropic(timeout=45.0, max_retries=1)
-
-
 @router.post("/chat", response_model=AssistantResult)
-def chat(body: ChatIn, client=Depends(get_client)):
+def chat(body: ChatIn, client=Depends(llm.get_client)):
     current = tidy(body.current) or {}
     target = tidy(body.target) if body.target else None
     if client is not None:
         try:
-            return ask_claude(client, body.message, [t.model_dump() for t in body.history],
+            return ask_gemini(client, body.message, [t.model_dump() for t in body.history],
                               current, target, body.total)
-        except (anthropic.APIError, json.JSONDecodeError, pydantic.ValidationError) as e:
+        except llm.FAILURES as e:
             log.warning("assistant fell back to rules: %s", e)
             result = rule_based(body.message, target or current)
             result.reply = "The assistant is busy, so I used the simple reader. " + result.reply

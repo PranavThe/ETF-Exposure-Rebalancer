@@ -38,7 +38,7 @@ and portfolio activity. It is an API feature, not a date-comparison screen in th
 ## 2. Scope and non-goals
 
 Supported product features include anonymous saved portfolios, ETF search, sector targets,
-constrained allocation plans, optional Claude support with a rule-based fallback, multiple
+constrained allocation plans, optional Gemini support with a rule-based fallback, multiple
 issuer/SEC import paths, and the existing two-project Vercel deployment.
 
 Non-goals are accounts and payments, brokerage execution, personalized investment advice,
@@ -47,7 +47,8 @@ whole-share order sizing. Adding new infrastructure requires the working-contrac
 
 ## 3. Stack and commands
 
-- **Backend:** Python 3.11+, FastAPI, Uvicorn, SQLAlchemy 2.x, psycopg 3, and the Anthropic SDK.
+- **Backend:** Python 3.11+, FastAPI, Uvicorn, SQLAlchemy 2.x, psycopg 3, and the Google Gen AI SDK
+  (`google-genai`) for Gemini.
   Exact dependency constraints are in `requirements.txt`; pytest and httpx are development
   dependencies in `requirements-dev.txt`.
 - **Database:** SQLite by default (`sqlite:///./fundshift.db`), or Postgres through `DATABASE_URL`.
@@ -270,9 +271,11 @@ small positions below 1%, round amounts to dollars while conserving the portfoli
 and omit unchanged, duplicate or non-improving plans. A valid rearrangement can improve by
 less than 0.5 pp.
 
-`POST /chat` translates user language into a target mix. With `ANTHROPIC_API_KEY`, Scythe
-uses the model configured in `backend/app/assistant.py`; otherwise or on a supported API
-error, it uses the rule-based reader. It receives the message, recent conversation, current
+`POST /chat` translates user language into a target mix. With `GEMINI_API_KEY`, Gemini
+(the models listed in `backend/app/llm.py`, tried in order) reads which sectors to set,
+adjust, scale or cap; `apply_changes` in `backend/app/assistant.py` does the arithmetic, so
+the model never produces the numbers. Without a key, or when every model fails, it uses the
+rule-based reader. It receives the message, recent conversation, current
 mix, target and portfolio total, but no ETF list supplied automatically. User messages may
 include information they choose to type. Scythe changes only the target; it never
 chooses one, recommends an ETF, or changes the money available to the planner. Sliders work

@@ -92,7 +92,7 @@ export default function LandingPage() {
             title: "Plain words, exact numbers",
             body: (
               <p>
-                Scythe can use Claude, with a basic reader when Claude is unavailable. It changes the target mix,
+                Scythe uses Gemini to read your words, with a basic reader as backup. It changes the target mix,
                 keeps the total at 100%, and shows weights in % and changes in pp.
               </p>
             ),

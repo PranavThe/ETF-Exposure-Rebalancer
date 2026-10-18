@@ -266,9 +266,10 @@ export default function MethodologyPage() {
 
             <DocSection id="assistant" index={n("assistant")} title={t("assistant")}>
               <p>
-                Scythe can use Claude, a model made by Anthropic, or a basic reader when Claude is unavailable. Its
-                job is to turn what you type into a target mix. The plans themselves always come from the math above,
-                never from the model, and they always use the money already in your ETFs.
+                Scythe uses Google&apos;s Gemini, or a basic reader when Gemini is unavailable. Gemini only reads
+                what you want changed (&ldquo;Technology &minus;5 pp&rdquo;, &ldquo;Energy to 0%&rdquo;, &ldquo;no
+                sector above 20%&rdquo;); Glean&apos;s own code does every calculation. The plans themselves always
+                come from the math above, never from the model, and they always use the money already in your ETFs.
               </p>
               <Bullets>
                 <li>
@@ -287,13 +288,13 @@ export default function MethodologyPage() {
                   contains.
                 </li>
                 <li>
-                  Claude receives your message, recent chat turns, current sector mix, target and portfolio total
+                  Gemini receives your message, recent chat turns, current sector mix, target and portfolio total
                   when enabled. Glean does not automatically send your ETF list or account identity to it; text you
                   choose to type in a message is included.
                 </li>
               </Bullets>
               <p>
-                The sliders work without Scythe. If Claude isn&apos;t available, a simple built-in reader still
+                The sliders work without Scythe. If Gemini isn&apos;t available, a simple built-in reader still
                 handles plain requests such as &ldquo;less tech&rdquo;, &ldquo;no energy&rdquo; or &ldquo;30% health
                 care&rdquo;.
               </p>

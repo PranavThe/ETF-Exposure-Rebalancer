@@ -56,7 +56,7 @@ export default function ScytheSection({
         {connected !== null && (
           <span className={`ml-auto flex shrink-0 items-center gap-1.5 text-[11.5px] ${connected ? "text-up" : "text-faint"}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-up" : "bg-faint"}`} />
-            {connected ? "Claude" : "basic"}
+            {connected ? "Gemini" : "basic"}
           </span>
         )}
       </div>
