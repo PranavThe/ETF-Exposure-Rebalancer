@@ -88,11 +88,13 @@ established confidently. Until then, unresolved IDs should remain separate.
 
 ## Source limits and selection
 
-The planner and portfolio API use each fund's latest issuer/SEC snapshot unless a TickerInside
-snapshot is strictly newer or the only source. They never merge rows from two sources into one
-selected snapshot. N-PORT is broad and historical but delayed; issuer files can
-be fresher but differ by issuer. N-PORT does not provide a standard equity sector field, so those
-positions may show `Unknown` in fund holdings and change-analysis responses. The planner also
+The portfolio API uses each fund's latest issuer/SEC snapshot unless a TickerInside snapshot is
+strictly newer or the only source. The planner adds a classification check: a newer provider
+snapshot must classify at least as much of the fund as the issuer/SEC snapshot, or at least 80%.
+Neither merges rows from two sources into one selected snapshot. N-PORT is broad and historical
+but delayed; issuer files can be fresher but differ by issuer. N-PORT does not provide a standard
+equity sector field, so those positions may show `Unknown` in fund holdings and change-analysis
+responses. The planner also
 tries its company-name and matching-security sector fallbacks before marking them Unclassified.
 
 Some products hold derivatives, debt, collateral, or other assets. N-PORT rows outside supported

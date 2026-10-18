@@ -1,4 +1,4 @@
-"""Synthetic fixtures in data/sample/: weights are already fractions."""
+"""Synthetic regression fixtures in backend/tests/fixtures/: weights are fractions."""
 
 from .base import Adapter
 

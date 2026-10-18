@@ -12,8 +12,8 @@ startup with SQLAlchemy `metadata.create_all`. No existing table is changed.
 {
   "name": "My portfolio",
   "funds": [
-    {"ticker": "DEMO", "weight": 0.6},
-    {"ticker": "FLOWTEST", "weight": 0.4}
+    {"ticker": "ARKK", "weight": 0.6},
+    {"ticker": "IVV", "weight": 0.4}
   ]
 }
 ```
@@ -45,20 +45,21 @@ but cannot be edited from that browser.
   "coverage_weight": 0.6,
   "funds": [
     {
-      "ticker": "DEMO", "name": "Demo Active Fund", "issuer": "...", "weight": 0.6,
-      "status": "available", "as_of_date": "2026-10-03",
-      "snapshot": {"as_of_date": "2026-10-03", "source_url": "...", "source_file": "...", "content_hash": "...", "row_count": 4, "ingested_at": "..."},
-      "holdings": [{"security_id": "AAA", "ticker": "AAA", "name": "...", "asset_class": "equity", "source_sector": null, "sector": "...", "shares": 100, "price": 10, "market_value": 1000, "reported_weight": null}]
+      "ticker": "ARKK", "name": "ARK Innovation ETF", "issuer": "ARK Invest", "weight": 0.6,
+      "status": "available", "as_of_date": "2026-10-16",
+      "snapshot": {"as_of_date": "2026-10-16", "source_url": "...", "source_file": "...", "content_hash": "...", "row_count": 46, "ingested_at": "..."},
+      "holdings": [{"security_id": "88160R101", "ticker": "TSLA", "name": "TESLA INC", "asset_class": "equity", "source_sector": null, "sector": "Consumer Discretionary", "shares": 2065670, "price": 362.44, "market_value": 748681434.80, "reported_weight": 0.0976}]
     },
     {
-      "ticker": "ARKK", "name": "ARK Innovation ETF", "issuer": "...", "weight": 0.4,
+      "ticker": "IVV", "name": "iShares Core S&P 500 ETF", "issuer": "iShares", "weight": 0.4,
       "status": "missing", "as_of_date": null, "snapshot": null, "holdings": []
     }
   ]
 }
 ```
 
-The sample is illustrative; names, holdings, and dates depend on ingested data. For each fund,
+The response is illustrative of a database where ARKK has holdings and IVV does not; the hosted
+database's coverage can differ. Names, holdings, and dates depend on ingested data. For each fund,
 the endpoint selects the latest issuer/SEC snapshot unless a TickerInside snapshot is strictly
 newer or is the only source. On equal dates, it uses issuer/SEC data. `coverage_weight` is the sum of
 allocated weights for funds that have selected holdings. Missing funds remain in the response and are

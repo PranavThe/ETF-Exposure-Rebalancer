@@ -9,16 +9,16 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
 - `make setup`: create `.venv`, install `requirements-dev.txt`, `npm install` in `frontend/`
   (`requirements.txt` is runtime-only: Vercel installs it for the API)
 - `make test`: run pytest (`backend/tests`)
-- `make ingest-sample`: ingest every `data/sample/*.csv` (rerunning prints `already ingested`)
-- `make ingest-raw`: ingest every real issuer file in `data/raw/` (`make demo` runs both)
+- `make ingest-raw`: ingest every real issuer file in `data/raw/`
 - `make api`: run the FastAPI app on :8000. `make web`: run Next.js dev server on :3000
-- `make demo`: reset DB, ingest samples and raw files, start the API
 - Frontend: `frontend/` (Next.js 16; see `frontend/AGENTS.md`). Check with `npm run build` and `npm run lint`.
   Site pages in `app/(site)`; the app is one page, `app/(app)/app`, built from `components/planner`
   with its API calls, saving and sector helpers in `lib/planner.ts`. Product name: `lib/brand.ts`
   (`BRAND`), never hard-coded. `useSearchParams` needs `<Suspense>`. Theme tokens in
   `app/globals.css`; don't name a colour token after a Tailwind size (`base`, `sm`, ...).
-- One file: `.venv/bin/python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.csv [--adapter sample|ark] [--replace]`
+- One issuer file: `.venv/bin/python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_2026-10-16.csv [--replace]`
+- Synthetic DEMO/SPLT/FLOWTEST files live in `backend/tests/fixtures/` for regression tests;
+  they are not part of the hosted product or the API build seed.
 - DB: `DATABASE_URL` (default `sqlite:///./fundshift.db`; `postgres://` maps to psycopg 3). No Alembic.
 - Deploy: two Vercel projects from this repo (API at `./` via `index.py` + `vercel.json`, whose build
   runs `scripts/seed_db.py` into Neon; frontend at `frontend/`). See README "Deploy on Vercel".
@@ -37,13 +37,15 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   is planner-only: `/funds/...` and the change analysis still use `resolve_sector` alone.
 - The planner selects a TickerInside snapshot only when no issuer/SEC snapshot exists, or when it is
   newer and classifies as much of the fund (or at least `MIN_CLASSIFIED`). Ticker sectors from
-  `name_sectors.csv` prefer U.S. listings over foreign local codes (`NON_US_SOURCES` in `reference.py`). The app attempts a bounded TickerInside lookup when
-  adding a fund with no provider snapshot. Stored Alpaca IEX prices come from the scheduled or
-  manual sync, not from a browser request.
+  `name_sectors.csv` prefer U.S. listings over foreign local codes (`NON_US_SOURCES` in
+  `reference.py`). The app attempts a bounded TickerInside lookup when adding a fund with no
+  provider snapshot. Stored Alpaca IEX prices come from the scheduled or manual sync, not from
+  a browser request.
 - There are two plan types. Unchanged or duplicate results are omitted; any improvement to a
   rearrangement can be shown, while each newly added ETF must improve distance by at least 0.5 pp.
 - `load_universe` (`routes/plans.py`) reads only the held funds and the allowlist, caching mixes per
-  snapshot; `/etfs/covered` lists the allowlisted funds with holdings (plus local Synthetic samples).
+  snapshot; `/etfs/covered` lists the allowlisted funds with holdings (and Synthetic fixtures
+  only when a test database has loaded them).
 - Routes: `POST /plan`, `GET /etfs/covered`, `GET/PUT /portfolios/{id}/preferences` (`routes/plans.py`);
   `POST /chat` (`routes/chat.py`, `app/assistant.py`). Saved portfolios reuse the weights-based
   portfolio API; the dollar value and target live in `portfolio_preferences`.
@@ -51,7 +53,7 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   adds or takes out money (plans always use the money already in the ETFs). It uses
   `claude-haiku-5-5` (effort `low`, thinking on: off it gets the arithmetic wrong) when `ANTHROPIC_API_KEY`
   is set, else the rule-based reader. Tests use a fake client.
-- Funds with issuer "Synthetic" (DEMO, SPLT, FLOWTEST) can be held but are never suggested.
+- Test funds with issuer "Synthetic" (DEMO, SPLT, FLOWTEST) are never suggested.
 
 ## Units (SPEC §4)
 - Every weight, exposure, drift and effect is a FRACTION in code, DB and API (0.07 = 7%).

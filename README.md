@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
+  <a href="#use-glean">Use Glean</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#api">API</a> ·
   <a href="#deploy-on-vercel">Deployment</a> ·
@@ -31,38 +31,13 @@ Your holdings, sector sliders, suggested moves, and Scythe, the assistant, share
 
 **Built with** Next.js · React · TypeScript · Tailwind CSS · FastAPI · SQLAlchemy
 
-## Quick start
+## Use Glean
 
-**Requirements:** Python 3.11+, Node.js 20.9+, npm, and Make.
-
-```bash
-git clone https://github.com/PranavThe/ETF-Exposure-Rebalancer.git
-cd ETF-Exposure-Rebalancer
-make setup
-```
-
-Start the API with the bundled demo data:
-
-```bash
-# Terminal 1 — recreate the local demo database and start the API
-DATABASE_URL=sqlite:///./fundshift.db make demo
-```
-
-```bash
-# Terminal 2 — from the repository root
-make web
-```
-
-Open **[the planner](http://localhost:3000/app)**, the
-[landing page](http://localhost:3000), or the [interactive API docs](http://localhost:8000/docs).
-
-> [!IMPORTANT]
-> `make demo` deletes and recreates the database selected by `DATABASE_URL`, including saved
-> portfolios. The command above explicitly selects the local `fundshift.db` file.
-> Use `make api` to restart the API with existing data instead.
-
-Setup downloads dependencies. After setup, the bundled demo works without external data services
-or API keys; the assistant uses its built-in rule-based reader when no Anthropic key is set.
+Open **[the planner](https://etf-exposure-rebalancer.vercel.app/app)** in your browser. The
+[landing page](https://etf-exposure-rebalancer.vercel.app/),
+[methodology](https://etf-exposure-rebalancer.vercel.app/methodology), and
+[interactive API docs](https://fundshift-api.vercel.app/docs) are hosted too. No installation is
+needed to use the product.
 
 ### Try the workflow
 
@@ -78,19 +53,16 @@ or API keys; the assistant uses its built-in rule-based reader when no Anthropic
    editing requires the key stored in the creating browser. Editing a shared link saves a copy.
 
 > [!NOTE]
-> Bundled holdings cover **ARKK** and the synthetic **DEMO**, **SPLT**, and **FLOWTEST** fixtures.
-> The example always loads **IVV $6,000 / IYW $3,000 / ARKK $1,000**. When a fund is added, the
-> app tries a bounded TickerInside lookup if it has no stored provider snapshot. IVV and IYW
-> remain flagged if that lookup is unavailable and you have not imported issuer/SEC holdings.
-> For a fresh demo, add ARKK to inspect exposure. Import eligible ETFs to explore additional
-> plans; synthetic funds are never suggested.
-> See [ETF data sources](docs/etf-sources.md) for ingestion instructions.
+> The example portfolio fills in **IVV $6,000 / IYW $3,000 / ARKK $1,000** on the hosted site.
+> When a fund is added, the app tries a bounded TickerInside lookup if it has no stored provider
+> snapshot. A fund remains flagged if neither provider nor issuer/SEC holdings are available.
+> See [ETF data sources](docs/etf-sources.md) for coverage and ingestion details.
 
 ## How it works
 
 | Step | What Glean computes |
 | --- | --- |
-| **Look inside each ETF** | Groups positive issuer/SEC holding market values by sector, or uses reported TickerInside weights when that stored snapshot is newer. |
+| **Look inside each ETF** | Groups positive issuer/SEC holding market values by sector, or uses reported TickerInside weights when the stored snapshot meets the source-selection rule below. |
 | **Combine your exposure** | Blends available ETFs' sector mixes in proportion to your dollar amounts. Funds without data remain visible and are excluded from the planner's mix and moves. |
 | **Apply your target** | Uses the sector mix you choose with sliders or Scythe. The assistant translates your request into numbers. |
 | **Build plans** | Finds allocations using your existing portfolio total, either within your current ETFs or with a limited number of new funds. |
@@ -114,7 +86,7 @@ weight differences: 0 means identical mixes; 1 means no overlap.
   the fund (or at least 80% of it). It reports the selected source and date for each fund.
 - **Eligible additions:** new ETFs come from `SUGGESTABLE_ETFS` and must be at least 80%
   classified. Funds you already hold outside the allowlist can be kept or reduced, but never
-  increased. Synthetic fixtures are never suggested.
+  increased.
 - **Optimization:** a bounded least-squares problem balances closeness to the target with a
   small preference for smaller moves. New ETFs are considered one at a time and must improve
   distance by at least 0.5 pp each. Any rearrangement that improves the match can be shown,
@@ -127,8 +99,8 @@ weight differences: 0 means identical mixes; 1 means no overlap.
   you to edit your holdings. Sliders work independently of the assistant.
 
 The planner's formulas, allowlist, and thresholds live in
-[`backend/analytics/rebalance.py`](backend/analytics/rebalance.py). The local
-[methodology page](http://localhost:3000/methodology) explains the calculations in the app.
+[`backend/analytics/rebalance.py`](backend/analytics/rebalance.py). The hosted
+[methodology page](https://etf-exposure-rebalancer.vercel.app/methodology) explains the calculations in the app.
 
 </details>
 
@@ -137,31 +109,25 @@ The planner's formulas, allowlist, and thresholds live in
 **A searchable ticker does not guarantee holdings coverage.** The committed catalog contains
 5,787 ETF symbols as of October 17, 2026; it is separate from the holdings in your database.
 
-| Source | Role | Included in the local demo? |
+| Source | Role | Availability |
 | --- | --- | --- |
-| Nasdaq symbol catalog | ETF search and selection | Yes — dated catalog snapshot |
-| ARK issuer CSV | ARKK holdings with shares and market values | Yes — October 16, 2026 snapshot |
-| Synthetic fixtures | Repeatable pipeline and analytics examples | Yes — DEMO, SPLT, FLOWTEST |
-| iShares issuer CSVs | Holdings and issuer sector labels | No — import separately |
-| SEC N-PORT | Historical reported holdings | No — download and import separately |
-| TickerInside + Alpaca IEX | Provider holdings weights and stored daily price bars | No — provider lookup can run when a fund is added; a configured weekday sync refreshes holdings and prices |
+| Nasdaq symbol catalog | ETF search and selection | Seeded from the committed dated catalog |
+| ARK issuer CSV | ARKK holdings with shares and market values | Seeded from the committed October 16, 2026 snapshot |
+| iShares issuer CSVs | Holdings and issuer sector labels | Available when separately imported |
+| SEC N-PORT | Historical reported holdings | Available when separately imported |
+| TickerInside + Alpaca IEX | Provider holdings weights and stored daily price bars | Provider lookup can run when a fund is added; a configured weekday sync refreshes holdings and prices |
 
-Production seeding loads the catalog and files in `data/raw/`, excludes `data/sample/`, and removes
-previously seeded synthetic snapshots. Provider weights and prices are stored separately from
-the share-count snapshots used for holdings-change analysis.
+Production seeding loads the catalog and issuer files in `data/raw/`. Synthetic regression
+fixtures live under `backend/tests/fixtures/` and are not seeded into the hosted database.
+Provider weights and prices are stored separately from the share-count snapshots used for
+holdings-change analysis.
 
 <details>
-<summary><strong>Ingest a holdings file</strong></summary>
+<summary><strong>Import an issuer holdings file (maintainers)</strong></summary>
 
 From the repository root, after `make setup`:
 
 ```bash
-# Import a bundled fixture
-.venv/bin/python scripts/run_pipeline.py \
-  --fund DEMO \
-  --file data/sample/demo_2026-10-01.csv \
-  --adapter sample
-
 # Import the committed issuer snapshot
 .venv/bin/python scripts/run_pipeline.py \
   --fund ARKK \
@@ -173,8 +139,8 @@ From the repository root, after `make setup`:
 
 Import the newly fetched path with `scripts/run_pipeline.py --fund ARKK --file <path>`.
 Ingestion commands use `DATABASE_URL`, defaulting to the local SQLite database.
-Available adapters are `sample`, `ark`, and `ishares`; ARKK and local fixtures have defaults,
-while other funds require an explicit adapter.
+Production issuer adapters are `ark` and `ishares`; ARKK has a default, while other funds
+require an explicit adapter. The `sample` adapter is used by regression tests only.
 
 | Outcome | Exit code | Meaning |
 | --- | --- | --- |
@@ -194,23 +160,23 @@ to build history. See [ETF data sources](docs/etf-sources.md) for iShares and SE
 
 ## API
 
-The full request and response schemas are available at **[localhost:8000/docs](http://localhost:8000/docs)**
-when the API is running.
+The full request and response schemas are available in the
+**[hosted API docs](https://fundshift-api.vercel.app/docs)**.
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Database status, fund count, issuer/SEC snapshot count, and deployed commit |
 | `GET /etfs/search?q=IVV` | Search registered ETFs and inspect data availability |
-| `GET /etfs/covered` | Allowlisted ETFs with data, plus marked local fixtures |
+| `GET /etfs/covered` | Allowlisted ETFs with holdings data |
 | `POST /plan` | Calculate sector exposure and plans for dollar-based holdings |
 | `POST /chat` | Translate a message into a target mix with Scythe |
 | `POST /portfolios` | Create an anonymous portfolio and receive its edit key |
 | `GET /portfolios/{id}/analysis` | Aggregate holdings, overlap, sectors, and coverage |
 
-For example, inspect ARKK's exposure after starting the demo:
+For example, inspect ARKK's exposure through the hosted API:
 
 ```bash
-curl --fail-with-body http://localhost:8000/plan \
+curl --fail-with-body https://fundshift-api.vercel.app/plan \
   -H 'Content-Type: application/json' \
   -d '{"holdings":[{"ticker":"ARKK","amount":1000}]}'
 ```
@@ -275,7 +241,7 @@ holdings, except DEMO, which uses the top 2. Golden examples are defined in [SPE
 
 ## Configuration
 
-No environment variables are required for the default local setup.
+The hosted services configure their own environment; these variables are for development and deployment.
 
 | Variable | Where | Default / purpose |
 | --- | --- | --- |
@@ -314,13 +280,15 @@ Rebuild the frontend after changing its API URL. Verify the API at `/health` and
 
 ## Development
 
+For repository development, install Python 3.11+, Node.js 20.9+, npm, and Make. The hosted
+product above does not require these tools.
+
 | Command | What it does |
 | --- | --- |
 | `make setup` | Create `.venv` and install Python and frontend dependencies |
 | `make api` | Start FastAPI on port 8000 using existing data |
 | `make web` | Start the Next.js development server on port 3000 |
 | `make test` | Run the Python analytics, pipeline, and API suites |
-| `make ingest-sample` | Import local synthetic fixtures |
 | `make ingest-raw` | Import issuer CSVs from `data/raw/` using default adapters |
 | `npm --prefix frontend run lint` | Run frontend ESLint checks |
 | `npm --prefix frontend run build` | Build the frontend for production |
@@ -330,7 +298,7 @@ backend/
   analytics/       Exposure, optimization, decomposition, and portfolio calculations
   app/             FastAPI routes, schemas, database models, and assistant
   pipeline/        Adapters, validation, normalization, and data loading
-  tests/           Analytics, pipeline, and API tests
+  tests/           Analytics, pipeline, and API tests plus synthetic fixtures
 frontend/
   app/             Landing page (/), methodology (/methodology), and planner (/app)
   components/      Marketing site and planner interface
@@ -338,7 +306,6 @@ frontend/
 data/
   raw/             Committed issuer holdings
   reference/       ETF catalog and sector mappings
-  sample/          Local synthetic fixtures
 docs/              Data-source and API guides
 scripts/           Data fetching, ingestion, seeding, and provider sync
 ```
