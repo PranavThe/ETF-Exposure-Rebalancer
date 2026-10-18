@@ -203,7 +203,6 @@ export default function TopBar({
   owner,
   canShare,
   onShare,
-  onReset,
 }: {
   covered: CoveredEtf[];
   held: Set<string>;
@@ -213,7 +212,6 @@ export default function TopBar({
   owner: boolean;
   canShare: boolean;
   onShare: () => void;
-  onReset: (() => void) | null;
 }) {
   const saveText =
     save === "saved" ? (owner ? "Saved" : "Shared view") : save === "saving" || save === "pending" ? "Saving" : save === "error" ? "Not saved" : "Draft";
@@ -256,20 +254,6 @@ export default function TopBar({
               <path d="M14 10a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1-1" />
             </svg>
             Share
-          </button>
-        )}
-        {onReset && (
-          <button
-            type="button"
-            onClick={onReset}
-            title="Start over"
-            aria-label="Start over"
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted transition-colors hover:border-line-2 hover:text-fg"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
           </button>
         )}
       </div>
