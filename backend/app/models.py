@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Date, DateTime, Double, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, Double, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -99,3 +99,18 @@ class PortfolioFund(Base):
     portfolio_id: Mapped[str] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"))
     fund_id: Mapped[int] = mapped_column(ForeignKey("funds.id"))
     weight: Mapped[float] = mapped_column(Double)
+
+
+class PortfolioPreference(Base):
+    """What the user told the planner: the portfolio's dollar value and the sector mix they want.
+
+    A separate table so the existing portfolio tables stay unchanged (no migrations).
+    """
+
+    __tablename__ = "portfolio_preferences"
+
+    portfolio_id: Mapped[str] = mapped_column(
+        ForeignKey("portfolios.id", ondelete="CASCADE"), primary_key=True)
+    total_value: Mapped[float | None] = mapped_column(Double, nullable=True)
+    target: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # sector -> fraction
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
