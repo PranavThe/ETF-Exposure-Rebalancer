@@ -265,3 +265,27 @@ def test_provider_tickers_take_their_sector_from_the_reference_file(client, allo
     covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
     assert mix(covered["WTONLY"]["sectors"]) == pytest.approx(
         {"Technology": 0.5, "Energy": 0.3, "Financials": 0.2})
+
+
+def test_options_on_a_stock_do_not_make_it_cash(client, allow):
+    allow("WTOPT")
+    # An option-income fund's latest filing lists AAPL call options (non-equity) under AAPL's ticker.
+    with Session(get_engine()) as session, session.begin():
+        fund = Fund(ticker="OPTX", name="Option Income Fund", issuer="Test Issuer")
+        session.add_all([fund, Fund(ticker="WTOPT", name="Weights Only", issuer="Test Issuer")])
+        session.flush()
+        filing = Snapshot(fund_id=fund.id, as_of_date=date(2026, 10, 16), content_hash="optx", row_count=1)
+        session.add(filing)
+        session.flush()
+        session.add(Holding(snapshot_id=filing.id, security_id="AAPL-CALL", ticker="AAPL", name="AAPL call",
+                            asset_class="derivative", shares=1, price=5, market_value=5))
+        snapshot = ProviderHoldingsSnapshot(
+            provider="tickerinside", fund_ticker="WTOPT", fund_name="Weights Only",
+            as_of_date=date(2026, 10, 17), source_layer="issuer", source_url="https://example.test",
+            cite_as="TickerInside", content_hash="provider-wtopt",
+        )
+        session.add(snapshot)
+        session.flush()
+        session.add(ProviderHolding(snapshot_id=snapshot.id, ticker="AAPL", weight=1.0))
+    covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
+    assert mix(covered["WTOPT"]["sectors"]) == {"Technology": 1.0}

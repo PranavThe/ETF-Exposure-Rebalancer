@@ -181,20 +181,23 @@ _provider_mixes: dict[tuple[int, str], dict[str, float]] = {}
 
 
 def _ticker_sectors(session: Session, symbols: set[str]) -> dict[str, str]:
-    """Provider symbol -> sector: the newest sector our issuer/SEC rows give that ticker, else the
-    reference file's. Symbols neither knows stay Unclassified rather than getting a guessed sector."""
+    """Provider symbol -> sector: the newest sector our issuer/SEC equity rows give that ticker, else
+    the reference file's. Symbols neither knows stay Unclassified rather than getting a guessed sector.
+
+    Only equity rows count: options on a stock (e.g. in an option-income ETF) can carry the stock's
+    ticker, and must not turn that stock into Cash & other.
+    """
     out: dict[str, str] = {}
     table = sector_map(session)
     for row in session.execute(
-        select(Holding.ticker, Holding.security_id, Holding.source_sector, Holding.asset_class)
+        select(Holding.ticker, Holding.security_id, Holding.source_sector)
         .join(Snapshot, Snapshot.id == Holding.snapshot_id)
-        .where(Holding.ticker.in_(sorted(symbols)))
+        .where(Holding.ticker.in_(sorted(symbols)), Holding.asset_class == "equity")
         .order_by(Snapshot.as_of_date.desc(), Holding.id.desc())
     ):
         if row.ticker in out:
             continue
-        sector = (canonical_sector(resolve_sector(row.security_id, row.source_sector, table))
-                  if row.asset_class == "equity" else "Cash & other")
+        sector = canonical_sector(resolve_sector(row.security_id, row.source_sector, table))
         if sector != UNCLASSIFIED:
             out[row.ticker] = sector
     reference = reference_ticker_sectors()
