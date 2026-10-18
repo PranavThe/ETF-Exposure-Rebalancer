@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.app.assistant import MODEL, ask_claude, rule_based, tidy
+from backend.app.assistant import MODEL, READING_SCHEMA, ask_claude, rule_based, tidy
 
 BASE = {"Technology": 0.5, "Health Care": 0.2, "Financials": 0.2, "Energy": 0.1}
 
@@ -21,10 +21,11 @@ class FakeClient:
     def __init__(self, payload: dict | None = None, stop_reason: str = "end_turn", error: Exception | None = None):
         self.calls: list[dict] = []
         self.payload, self.stop_reason, self.error = payload, stop_reason, error
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self.create))
+        self.messages = SimpleNamespace(create=lambda **kw: self.create("messages", **kw))
+        self.beta = SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: self.create("beta", **kw)))
 
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
+    def create(self, endpoint: str, **kwargs):
+        self.calls.append({"endpoint": endpoint, **kwargs})
         if self.error:
             raise self.error
         content = [SimpleNamespace(type="text", text=json.dumps(self.payload))] if self.payload else []
@@ -46,12 +47,20 @@ def test_claude_reading_becomes_a_fraction_target():
     assert result.source == "claude" and result.cash_change is None
     assert result.target == pytest.approx({"Technology": 0.4, "Health Care": 0.3, "Financials": 0.2, "Energy": 0.1})
     [call] = client.calls
-    assert call["model"] == MODEL
-    assert call["output_config"]["format"]["type"] == "json_schema"
-    assert call["fallbacks"] == "default"
+    assert call["model"] == MODEL == "claude-haiku-5-5"
+    assert call["endpoint"] == "messages" and "fallbacks" not in call  # Haiku has no refusal fallback
+    assert call["output_config"] == {"effort": "low", "format": {"type": "json_schema", "schema": READING_SCHEMA}}
     assert [m["role"] for m in call["messages"]] == ["user", "assistant", "user"]
     state = call["messages"][-1]["content"][0]["text"]
     assert "Technology 50.0%" in state and "not set" in state and "$10,000" in state
+
+
+def test_larger_models_get_the_server_side_refusal_fallback():
+    client = FakeClient({"reply": "Set.", "changed": False, "target": [], "cash_change": None})
+    ask_claude(client, "hi", [], BASE, None, 0, model="claude-sonnet-5-5")
+    [call] = client.calls
+    assert call["endpoint"] == "beta" and call["model"] == "claude-sonnet-5-5"
+    assert call["fallbacks"] == "default" and call["betas"] == ["server-side-fallback-2026-07-01"]
 
 
 def test_claude_unchanged_reading_and_refusal_keep_the_target():

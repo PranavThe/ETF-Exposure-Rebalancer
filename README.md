@@ -79,7 +79,7 @@ differences.
   reducing; or the same with rearranging. New ETFs are added one at a time, each only if it brings
   the plan at least 0.5 pp closer; positions under 1% of the portfolio are dropped; amounts are
   whole dollars. Plans that change nothing or repeat another plan are not shown.
-- **The assistant** (`POST /chat`) asks Claude (`claude-opus-5-5`, JSON-schema output) to turn the
+- **The assistant** (`POST /chat`) asks Claude Haiku 5.5 (`claude-haiku-5-5`, JSON-schema output, effort `low`) to turn the
   message into a full target mix and, if mentioned, money added or taken out. It never picks a mix
   for the user. Without `ANTHROPIC_API_KEY`, or if the call fails, a small rule-based reader handles
   plain requests ("less tech", "no energy", "30% financials", "I'm adding $2,000"). Sliders always work.
