@@ -138,6 +138,8 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 | `GET /funds/{ticker}/snapshots` | dates with `source_url, content_hash, row_count, ingested_at` |
 | `GET /funds/{ticker}/holdings?date=YYYY-MM-DD` | the stored rows with resolved sectors (the "view underlying data" link) |
 | `GET /funds/{ticker}/changes?from=&to=` | the full comparison; 404 for an unknown fund or date, 422 when `from ≥ to` |
+| `GET /provider-data/funds/{ticker}/holdings` | latest TickerInside weights and changes from the prior source date |
+| `GET /provider-data/prices?symbols=AAPL,MSFT` | latest stored Alpaca IEX daily bars; `as_of`, `start`, and `end` select dates |
 | `GET /etfs/search?q=IVV&limit=20` | search registered ETF symbols; includes latest data date when loaded |
 | `POST /portfolios` | create an anonymous saved portfolio; returns its edit key once |
 | `GET /portfolios/{id}` | portfolio name and allocated funds |
@@ -152,7 +154,9 @@ for request examples, missing-data behavior, and the analytics handoff.
 
 The build seeds a dated snapshot of 5,787 U.S.-listed ETF symbols for search and portfolio
 selection. This catalog is separate from holdings coverage. The data team can refresh the
-catalog from Nasdaq and ingest SEC N-PORT or iShares holdings. See [ETF data sources](docs/etf-sources.md).
+catalog from Nasdaq and ingest SEC N-PORT or iShares holdings. The additive provider job can also
+store TickerInside weights and Alpaca IEX daily prices without replacing SEC snapshots. See
+[ETF data sources](docs/etf-sources.md) and [provider market data](docs/provider-market-data.md).
 Listing a symbol does not claim its holdings are available.
 
 Interactive docs are at http://localhost:8000/docs.

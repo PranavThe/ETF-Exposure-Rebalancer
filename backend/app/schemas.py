@@ -18,6 +18,7 @@ class FundOut(BaseModel):
     issuer: str
     snapshot_count: int
     latest_as_of_date: date | None
+    provider_holdings_as_of_date: date | None = None
 
 
 class SnapshotMeta(BaseModel):

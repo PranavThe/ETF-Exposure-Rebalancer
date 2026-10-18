@@ -60,6 +60,54 @@ class Holding(Base):
     reported_weight: Mapped[float | None] = mapped_column(Double, nullable=True)
 
 
+class ProviderHoldingsSnapshot(Base):
+    """Weight-only snapshot from an external holdings provider (kept apart from N-PORT rows)."""
+    __tablename__ = "provider_holdings_snapshots"
+    __table_args__ = (UniqueConstraint("provider", "fund_ticker", "as_of_date", "content_hash"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    fund_ticker: Mapped[str] = mapped_column(String(16), index=True)
+    fund_name: Mapped[str] = mapped_column(String(200))
+    as_of_date: Mapped[date] = mapped_column(Date)
+    source_layer: Mapped[str] = mapped_column(String(32))
+    source_url: Mapped[str] = mapped_column(String(500))
+    cite_as: Mapped[str] = mapped_column(Text, default="")
+    content_hash: Mapped[str] = mapped_column(String(64))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProviderHolding(Base):
+    __tablename__ = "provider_holdings"
+    __table_args__ = (UniqueConstraint("snapshot_id", "ticker"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("provider_holdings_snapshots.id", ondelete="CASCADE"), index=True
+    )
+    ticker: Mapped[str] = mapped_column(String(32))
+    weight: Mapped[float] = mapped_column(Double)
+
+
+class SecurityPrice(Base):
+    """Daily OHLCV price bar, with source feed recorded for data provenance."""
+    __tablename__ = "security_prices"
+    __table_args__ = (UniqueConstraint("provider", "feed", "adjustment", "ticker", "as_of_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    feed: Mapped[str] = mapped_column(String(16))
+    adjustment: Mapped[str] = mapped_column(String(16), default="all")
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    open: Mapped[float] = mapped_column(Double)
+    high: Mapped[float] = mapped_column(Double)
+    low: Mapped[float] = mapped_column(Double)
+    close: Mapped[float] = mapped_column(Double)
+    volume: Mapped[float] = mapped_column(Double)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class ImportLog(Base):
     __tablename__ = "import_log"
 

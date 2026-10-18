@@ -8,6 +8,7 @@ export type Fund = {
   issuer: string;
   snapshot_count: number;
   latest_as_of_date: string | null;
+  provider_holdings_as_of_date?: string | null;
 };
 
 export type SnapshotMeta = {
@@ -151,8 +152,24 @@ export type PortfolioAllocation = { ticker: string; name: string; issuer: string
 export type Portfolio = { id: string; name: string; funds: PortfolioAllocation[]; created_at: string | null; updated_at: string | null };
 export type PortfolioCreated = Portfolio & { edit_key: string };
 export type PortfolioInput = { name: string; funds: { ticker: string; weight: number }[] };
-export type PortfolioFundAnalysis = PortfolioAllocation & { status: string; as_of_date: string | null };
-export type PortfolioExposure = { security_id: string; ticker: string; name: string; asset_class: string; sector: string; weight: number; funds: string[] };
+export type PortfolioFundAnalysis = PortfolioAllocation & {
+  status: string;
+  as_of_date: string | null;
+  source_provider: string | null;
+  source_layer: string | null;
+};
+export type PortfolioExposure = {
+  security_id: string;
+  ticker: string;
+  name: string;
+  asset_class: string;
+  sector: string;
+  weight: number;
+  funds: string[];
+  latest_price: number | null;
+  latest_price_as_of_date: string | null;
+  price_provider: string | null;
+};
 export type PortfolioAnalysis = {
   portfolio: Portfolio;
   coverage_weight: number;
@@ -164,6 +181,15 @@ export type PortfolioAnalysis = {
   sectors: { name: string; weight: number }[];
   asset_classes: { name: string; weight: number }[];
   caveats: string[];
+};
+
+export type ProviderHoldingChanges = {
+  fund: string;
+  snapshot: { as_of_date: string; source_layer: string; cite_as: string; fetched_at: string };
+  previous_as_of_date: string | null;
+  entered: { ticker: string; weight: number }[];
+  no_longer_reported: { ticker: string; previous_weight: number }[];
+  changed_weights: { ticker: string; previous_weight: number; weight: number; change: number }[];
 };
 
 export type SimulationRequest = { target_weights: Record<string, number> };
@@ -196,6 +222,7 @@ export const api = {
   searchEtfs: (q: string, signal?: AbortSignal) => getJson<Fund[]>(`/etfs/search?q=${encodeURIComponent(q)}&limit=20`, signal),
   portfolio: (id: string) => getJson<Portfolio>(`/portfolios/${encodeURIComponent(id)}`),
   portfolioAnalysis: (id: string) => getJson<PortfolioAnalysis>(`/portfolios/${encodeURIComponent(id)}/analysis`),
+  providerHoldingChanges: (ticker: string) => getJson<ProviderHoldingChanges>(`/provider-data/funds/${encodeURIComponent(ticker)}/holdings`),
   previewPortfolio: (id: string | null, body: PortfolioInput) => sendJson<PortfolioAnalysis>(id ? `/portfolios/${encodeURIComponent(id)}/preview` : "/portfolios/preview", "POST", body),
   createPortfolio: (body: PortfolioInput) => sendJson<PortfolioCreated>("/portfolios", "POST", body),
   updatePortfolio: (id: string, key: string, body: PortfolioInput) => sendJson<Portfolio>(`/portfolios/${encodeURIComponent(id)}`, "PUT", body, key),
