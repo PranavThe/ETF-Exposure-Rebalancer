@@ -58,20 +58,25 @@ but cannot be edited from that browser.
 }
 ```
 
-The sample is illustrative; names, holdings, and dates depend on ingested data. The endpoint
-selects the greatest `as_of_date` separately for each fund. `coverage_weight` is the sum of
-allocated weights for funds that have a snapshot. Missing funds remain in the response and are
+The sample is illustrative; names, holdings, and dates depend on ingested data. For each fund,
+the endpoint selects the latest issuer/SEC snapshot unless a TickerInside snapshot is strictly
+newer or is the only source. On equal dates, it uses issuer/SEC data. `coverage_weight` is the sum of
+allocated weights for funds that have selected holdings. Missing funds remain in the response and are
 never silently redistributed. The frontend should display each fund's date and an incomplete
 coverage warning when `coverage_weight < 1`. Different dates can appear in one portfolio.
-Resolved sectors use the same reference mapping as the existing fund holdings endpoint.
+Issuer/SEC rows use the same reference and issuer-label mapping as the fund holdings endpoint;
+provider rows use ticker-sector references. The planner may classify additional issuer/SEC rows
+using its company-name and matching-security fallbacks.
 
 ## Portfolio analysis
 
-`GET /portfolios/{id}/analysis` aggregates the latest rows. For each available fund, it computes a holding's
-within-fund weight as `market_value / sum(market_value for all holdings in that fund)` (including
-cash and other asset classes). Its portfolio exposure is `fund allocation weight * within-fund
-weight`. Group holdings by `security_id` for combined exposure and overlap, and by resolved
-`sector` for sector exposure. Keep cash and other asset classes visible. Report both
+`GET /portfolios/{id}/analysis` aggregates the selected rows. For issuer/SEC holdings, it computes
+a holding's within-fund weight as `market_value / sum(positive market_value for all holdings in that
+fund)` (including cash and other asset classes). For a selected TickerInside snapshot, it uses the
+provider's reported weights; those rows have no shares or market values. Its portfolio exposure
+is `fund allocation weight * within-fund weight`. Group holdings by `security_id` for combined
+exposure and overlap, and by resolved `sector` for sector exposure. Keep cash and other asset
+classes visible. Report both
 `coverage_weight` and the per-fund `as_of_date` with every aggregate; do not renormalize the
 available funds to 100% when data is missing. Portfolio history and time comparisons need a
 separate allocation history design and are outside this initial contract.

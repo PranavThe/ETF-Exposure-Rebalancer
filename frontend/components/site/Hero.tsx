@@ -6,7 +6,7 @@ import { Crosshair } from "./Frame";
 import HeroSpray from "./HeroSpray";
 import { LAUNCH_APP } from "./links";
 
-const DATA_SOURCES = ["ARK Invest", "iShares", "SEC N-PORT filings"];
+const DATA_SOURCES = ["ARK Invest", "iShares", "SEC N-PORT", "TickerInside"];
 
 /** White rectangular call to action with crosshair marks at its corners. */
 export function LaunchButton() {
@@ -45,8 +45,8 @@ export default function Hero() {
           See what you really own. Choose the mix you want.
         </h1>
         <p className="mt-6 max-w-[580px] text-[16px] leading-[1.6] text-muted sm:text-[17px]">
-          Add the ETFs you hold and how much is in each. {BRAND} looks inside every fund, shows how your money is
-          spread across sectors, and works out the moves that get you to the mix you choose.
+          Add the ETFs you hold and how much is in each. {BRAND} uses available holdings to show how your money is
+          spread across sectors, then works out moves toward the mix you choose.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5">
           <LaunchButton />

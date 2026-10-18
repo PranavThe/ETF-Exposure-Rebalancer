@@ -32,7 +32,7 @@ const t = (id: string) => SECTIONS.find((s) => s.id === id)?.title ?? id;
 // Mirrors backend/analytics/rebalance.py (max_new_funds is build_plans' default; the app lets you change it).
 const PLANNER_CONFIG = `SHORTLIST_SIZE = 12       # candidate new ETFs considered per plan
 MIN_POSITION   = 0.01     # 1% of the portfolio
-MIN_GAIN       = 0.005    # 0.5 pp closer to the target
+MIN_GAIN       = 0.005    # 0.5 pp per newly added ETF
 max_new_funds  = 2        # default limit on new ETFs per plan`;
 
 export default function MethodologyPage() {
@@ -99,7 +99,8 @@ export default function MethodologyPage() {
                   $1,000.
                 </li>
                 <li>
-                  Each ETF&apos;s latest published holdings are grouped by sector, by market value. Your{" "}
+                  Each covered ETF&apos;s selected stored holdings are grouped by sector, using reported market values
+                  or provider weights. Your{" "}
                   <Term>sector mix</Term> is those ETF mixes blended by your dollars.
                 </li>
                 <li>
@@ -133,19 +134,25 @@ export default function MethodologyPage() {
 
             <DocSection id="etf-mix" index={n("etf-mix")} title={t("etf-mix")}>
               <p>
-                Each ETF uses its <Term>latest stored holdings snapshot</Term>. Every holding is put in a sector, and a
-                sector&apos;s weight is the market value of its holdings over the ETF&apos;s total market value. Only
-                rows with a positive market value count.
+                Each ETF uses one selected stored holdings snapshot. For issuer and SEC files, each holding is put in
+                a sector and counted by its positive market value. TickerInside snapshots provide weights instead of
+                market values; their positive weights are grouped by sector and normalized to 100%.
               </p>
               <Formula label="ETF sector mix">{`etf_mix[s] = Σ market value of holdings in sector s
              ÷ Σ market value of all holdings
 
-(holdings with a positive market value only)`}</Formula>
+(issuer/SEC holdings with a positive market value only)`}</Formula>
+              <Formula label="TickerInside sector mix">{`etf_mix[s] = Σ positive reported weights in sector s
+             ÷ Σ positive reported weights in the selected snapshot`}</Formula>
               <p>
                 A holding&apos;s sector comes from a maintained reference list for that security, then from the
-                issuer&apos;s own sector column, then <Term>Unclassified</Term>. Issuers spell sectors differently, so
-                their labels are mapped to the 11 standard sectors. Anything that isn&apos;t a stock, such as cash,
-                money-market funds, futures or warrants, goes to <Term>Cash &amp; other</Term>.
+                issuer&apos;s own sector column. If neither resolves it, the planner uses a company-name reference,
+                then the sector of the same security in another eligible ETF. Remaining gaps are
+                <Term>Unclassified</Term>. For TickerInside weights, the planner first uses a matching ticker&apos;s sector
+                from stored issuer/SEC equity holdings, then a ticker-sector reference; unknown symbols remain
+                unclassified. Issuers spell sectors differently, so known labels are mapped
+                to standard sectors. Non-equity rows in issuer and SEC files, such as cash, money-market funds,
+                futures or warrants, go to <Term>Cash &amp; other</Term>.
               </p>
               <DocTable
                 head={["Sector", "Issuer labels mapped to it"]}
@@ -203,7 +210,8 @@ export default function MethodologyPage() {
             <DocSection id="plans" index={n("plans")} title={t("plans")}>
               <p>
                 A plan is a new dollar amount for each ETF, using the money already in your ETFs: the total stays the
-                same. There are two plans.
+                same. There are two plan types, though Glean shows only those that improve the match and make a
+                distinct move.
               </p>
               <DocTable
                 head={["Plan", "Allowed moves"]}
@@ -258,9 +266,9 @@ export default function MethodologyPage() {
 
             <DocSection id="assistant" index={n("assistant")} title={t("assistant")}>
               <p>
-                Scythe is the assistant. It runs on Claude, a model made by Anthropic, and its only job is to turn what
-                you type into a target mix. The plans themselves always come from the math above, never from the
-                model, and they always use the money already in your ETFs.
+                Scythe can use Claude, a model made by Anthropic, or a basic reader when Claude is unavailable. Its
+                job is to turn what you type into a target mix. The plans themselves always come from the math above,
+                never from the model, and they always use the money already in your ETFs.
               </p>
               <Bullets>
                 <li>
@@ -279,8 +287,9 @@ export default function MethodologyPage() {
                   contains.
                 </li>
                 <li>
-                  It sees your current sector mix, your target, your portfolio&apos;s total value and the last few
-                  messages, nothing else: not which ETFs you hold, and nothing about who you are.
+                  Claude receives your message, recent chat turns, current sector mix, target and portfolio total
+                  when enabled. Glean does not automatically send your ETF list or account identity to it; text you
+                  choose to type in a message is included.
                 </li>
               </Bullets>
               <p>
@@ -309,17 +318,29 @@ export default function MethodologyPage() {
                     "Holdings that funds report to the SEC, for many more ETFs. No sector field.",
                     "Published with a delay; can be a few months old",
                   ],
+                  [
+                    "TickerInside holdings",
+                    "Reported holding weights, without shares or per-holding market values",
+                    "The date reported by the provider; an added fund can trigger a lookup",
+                  ],
+                  [
+                    "Alpaca IEX closes",
+                    "Stored daily prices shown alongside provider holdings; not used to weight sector mixes",
+                    "Refreshed after market close on weekdays when the scheduled sync is configured",
+                  ],
                   ["Nasdaq symbol directories", "The list of U.S.-listed ETFs you can search", "No holdings"],
                 ]}
               />
               <p>
-                Each ETF uses its own newest snapshot, so ETFs in one portfolio can have different dates, and two
-                sources are never mixed inside one snapshot. Issuer files describe the previous market day at best, so
-                expect a lag of a day or more. ARK&apos;s file is read from:
+                Each ETF uses its latest stored issuer/SEC snapshot unless a TickerInside snapshot is strictly newer
+                or is the only available source. ETFs in one portfolio can have different dates, and sources are not
+                mixed inside one fund&apos;s selected snapshot. Issuer files describe the previous market day at best;
+                SEC filings can be older. When you add a fund, the app tries a bounded TickerInside lookup if none is
+                stored. ARK&apos;s file is read from:
               </p>
               <Formula>{ARK_CSV_URL}</Formula>
               <p>
-                Every file is checked row by row before it is stored, and each snapshot keeps its source address, date
+                Issuer and SEC files are checked before storage, and each snapshot keeps its source address, date
                 and a fingerprint of its contents. The searchable ETF list is much larger than the set with holdings:
                 an ETF without holdings data can be added to your portfolio, but it is flagged and left out of the math.
               </p>
@@ -346,13 +367,14 @@ export default function MethodologyPage() {
                   consequences.
                 </li>
                 <li>
-                  Holdings lag by a day or more (N-PORT by months), and funds change their holdings over time, so your
-                  real mix today can differ.
+                  Holdings can lag by a day or more (N-PORT by months), and funds change their holdings over time, so
+                  your real mix today can differ. Stored IEX closes are daily, not live prices.
                 </li>
                 <li>ETFs without holdings data are flagged and kept out of the mix and the plans.</li>
                 <li>
-                  Sector labels come from issuers and a reference list, not one official classification across all
-                  sources. ARK&apos;s sectors are assigned by the team; N-PORT holdings may be Unclassified.
+                  Sector labels come from issuers and maintained references, not one official classification across
+                  all sources. ARK&apos;s sectors are assigned by the team; unresolved N-PORT and TickerInside holdings
+                  may be Unclassified. IEX closes may differ from consolidated market prices.
                 </li>
                 <li>
                   The mix is by sector only. It says nothing about company size, country, or whether two ETFs hold the

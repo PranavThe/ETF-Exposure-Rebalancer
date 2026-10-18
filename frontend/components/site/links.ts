@@ -13,4 +13,4 @@ export const GITHUB: SiteLink = { label: "GitHub", href: GITHUB_URL, external: t
 
 export const NAV_LINKS: SiteLink[] = [LAUNCH_APP, METHODOLOGY, API_DOCS, GITHUB];
 
-export const DISCLAIMER = "Derived from issuer-published holdings snapshots. Not investment advice.";
+export const DISCLAIMER = "Based on dated ETF holdings. Not investment advice.";

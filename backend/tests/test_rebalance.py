@@ -5,7 +5,6 @@ import pytest
 
 from backend.analytics.rebalance import (
     CASH_OTHER,
-    MIN_GAIN,
     UNCLASSIFIED,
     build_plans,
     canonical_sector,
@@ -161,7 +160,7 @@ def test_a_plan_that_would_not_come_closer_is_dropped():
     assert build_plans(amounts, weights, target, max_new_funds=0) == []
 
 
-def test_every_plan_comes_at_least_min_gain_closer():
+def test_every_plan_comes_closer():
     rng = random.Random(1)
     sectors = ["Technology", "Health Care", "Financials", "Energy", "Utilities", "Real Estate", "Industrials"]
     for _ in range(150):
@@ -173,7 +172,17 @@ def test_every_plan_comes_at_least_min_gain_closer():
         target = normalize_target({s: rng.random() for s in rng.sample(sectors, rng.randint(1, 4))})
         before = distance(exposure(amounts, weights), target)
         for plan in build_plans(amounts, weights, target, max_new_funds=1):
-            assert plan.distance <= before - MIN_GAIN + 1e-12, (amounts, target, plan.kind)
+            assert plan.distance < before - 1e-9, (amounts, target, plan.kind)
+
+
+def test_rearrangement_with_small_improvement_is_shown():
+    amounts = {"T": 500, "H": 500}
+    weights = {"T": TECH, "H": HEALTH}
+    target = {"Technology": 0.503, "Health Care": 0.497}
+    plans = build_plans(amounts, weights, target, max_new_funds=0)
+    assert [plan.kind for plan in plans] == ["rearrange"]
+    assert plans[0].distance < 1e-9
+    assert plans[0].moves
 
 
 def test_held_fund_without_data_is_kept_out_of_planning():

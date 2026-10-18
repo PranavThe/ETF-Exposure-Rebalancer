@@ -23,7 +23,7 @@ const ITEMS = [
     title: "Does Scythe, the assistant, decide my mix?",
     body: (
       <p>
-        No. Scythe runs on Claude and only turns your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
+        No. Scythe can use Claude or a basic reader to turn your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
         a target mix you can see and change. Ask it which sector is best and it will tell you the choice is yours. The
         sliders do everything without it.
       </p>
@@ -33,9 +33,9 @@ const ITEMS = [
     title: "Where does the data come from?",
     body: (
       <p>
-        From holdings files that fund issuers publish, currently ARK Invest and iShares, and from the holdings that
-        funds report to the SEC in N-PORT filings. Each ETF uses its most recent stored snapshot, so what you see is
-        usually a day or more behind, and N-PORT holdings can be a few months old.
+        From issuer files, SEC N-PORT filings and stored TickerInside holdings weights. The app can look up
+        TickerInside data when you add a fund. It uses a stored holdings date, which can lag; SEC filings can be
+        months old. Stored Alpaca IEX closes may appear alongside provider holdings when the daily refresh is configured.
       </p>
     ),
   },

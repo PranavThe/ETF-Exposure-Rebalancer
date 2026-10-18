@@ -11,7 +11,7 @@ const STEPS = [
   },
   {
     title: "See your sector mix",
-    body: `${BRAND} looks inside each ETF's latest published holdings and blends them by your dollars, so you see where your money really sits.`,
+    body: `${BRAND} uses each covered ETF's latest selected holdings and blends them by your dollars, so you see the part of your mix it can calculate.`,
     example: "Technology 52.6%",
   },
   {

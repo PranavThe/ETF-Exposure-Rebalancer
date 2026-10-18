@@ -1,119 +1,146 @@
-# FundShift — Build Spec for Claude Code (final)
+# Glean — current product specification
 
-> Usage: put this file in an empty repo as `SPEC.md` and tell Claude Code:
-> "Read SPEC.md and follow it, starting at M0." Or paste the whole file as your first message.
+Glean is a sector-exposure planner with a marketing page at `/`, a methodology page at
+`/methodology`, and a single planning workspace at `/app`. This specification describes the
+maintained product, including its original holdings-comparison API. It is not a scaffold or a
+milestone plan for an empty repository.
 
----
+## 0. Working contract
 
-## 0. How you (Claude Code) must work
+- Keep the website, README, API guides, and this specification consistent when behavior changes.
+- **The golden values in §10 remain the source of truth for holdings-change analysis.** Never
+  edit an expected value to make a test pass; show the arithmetic if a value appears wrong.
+- Preserve the fractional units in §4 and decomposition formulas in §7. Ask before changing
+  those contracts, adding a service, database, queue or scheduler, or adding dependencies beyond §3.
+- Pure calculations live in `backend/analytics`; database and network orchestration belong in
+  routes and the pipeline. Tests must not depend on live network services.
+- Follow `CLAUDE.md` and `frontend/AGENTS.md`; read the installed Next.js documentation before
+  changing frontend code. Run the relevant checks in §11.
+- Product-facing text uses **Glean**. Frontend components read `BRAND` from `frontend/lib/brand.ts`.
+  Existing `fundshift.db` filenames, deployment addresses and saved links remain compatible.
 
-- Build in the milestone order in §11. Do not start a milestone until the previous milestone's acceptance commands pass. After each milestone, run its acceptance commands, show the output, and commit with message `M<n>: <summary>`.
-- **The golden values in §10 are the source of truth.** Never edit an expected value to make a test pass. If you believe a value in this spec is wrong, stop and show your arithmetic.
-- Stop and ask before you:
-  - change units or the decomposition math in §7
-  - add a service, database, queue, or scheduler
-  - add a dependency not listed in §3
-- Analytics code is pure: no DB, no network, no file IO. Tests never touch the network.
-- First action: create `CLAUDE.md` (under 60 lines) capturing the units (§4), language rules (§9), and make commands. Update it whenever a convention changes.
-- Prefer boring code. The only extension point is the adapter interface in §6. No plugin systems, no generic "issuer framework".
+## 1. What Glean does
 
-## 1. What FundShift is
+Users enter the dollars they hold in each ETF, inspect their combined sector mix, and choose a
+target with sliders or Scythe. Glean calculates possible allocations toward that target and
+shows the proposed moves and remaining distance. It never chooses a target for the user or
+connects to a brokerage.
 
-FundShift shows how an **actively managed ETF's** portfolio changed between two dates, and separates changes caused by **price movement** from changes caused by **portfolio activity** (the manager changing share counts).
+The workspace contains ETF search, holdings and source dates, current and target sector mixes,
+suggested moves, and Scythe. “Use these amounts” updates the in-app portfolio. It does not place
+orders. Edits save automatically; opening a shared portfolio without its edit key and changing
+it creates a separate copy.
 
-Demo story: "On the surface, X happened. Underneath, price moves did A and portfolio activity did B. Here are the positions that actually changed, and here is the source data that proves it."
+The original holdings-comparison engine remains accessible through
+`/funds/{ticker}/changes`. It separates changes between stored snapshots into price movement
+and portfolio activity. It is an API feature, not a date-comparison screen in the planner.
 
-## 2. Non-goals (do not build)
+## 2. Scope and non-goals
 
-- Auth or accounts, payments
-- AI/LLM features, recommendations or advice
-- Notifications, brokerage connections, real-time prices
-- Schedulers, queues, workers
-- More than one real issuer adapter
-- Deployment (unless you reach M7)
+Supported product features include anonymous saved portfolios, ETF search, sector targets,
+constrained allocation plans, optional Claude support with a rule-based fallback, multiple
+issuer/SEC import paths, and the existing two-project Vercel deployment.
 
-## 3. Stack (decided)
+Non-goals are accounts and payments, brokerage execution, personalized investment advice,
+market predictions, real-time market prices, tax optimization, transaction-cost modeling, and
+whole-share order sizing. Adding new infrastructure requires the working-contract review above.
 
-- **Backend:** Python 3.11+, FastAPI, Uvicorn, SQLAlchemy 2.x, pandas, pytest, httpx (for TestClient).
-- **Database:** SQLite file by default (`DATABASE_URL=sqlite:///./fundshift.db`). The code must also work on Postgres by changing only `DATABASE_URL`. Create tables with `metadata.create_all`. No Alembic.
-- **Frontend:** Next.js (App Router, current stable via create-next-app) + TypeScript + Tailwind + Recharts. Reads `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). Backend enables CORS for `http://localhost:3000`.
-- **Makefile targets:**
-  - `setup`
-  - `test`
-  - `ingest-sample`
-  - `api`
-  - `web`
-  - `demo`: reset the DB, ingest all sample fixtures, start the API
-- No Docker required.
+## 3. Stack and commands
 
-## 4. Data and units
+- **Backend:** Python 3.11+, FastAPI, Uvicorn, SQLAlchemy 2.x, psycopg 3, and the Anthropic SDK.
+  Exact dependency constraints are in `requirements.txt`; pytest and httpx are development
+  dependencies in `requirements-dev.txt`.
+- **Database:** SQLite by default (`sqlite:///./fundshift.db`), or Postgres through `DATABASE_URL`.
+  Tables are created with SQLAlchemy `metadata.create_all`; there is no Alembic dependency.
+- **Frontend:** Next.js App Router, React, TypeScript, Tailwind CSS and Recharts. Versions are
+  declared in `frontend/package.json` and locked in its lockfile. Node.js must meet Next.js's minimum
+  (20.9+) locally. The frontend reads `NEXT_PUBLIC_API_URL`, defaulting to `http://localhost:8000`.
+- **Local commands:** `make setup`, `make api`, `make web`, `make test`, `make ingest-sample`,
+  `make ingest-raw`, and `make demo`. `make demo` resets the selected database before seeding;
+  use `DATABASE_URL=sqlite:///./fundshift.db make demo` for an explicitly local demo.
+- **Deployment:** one Vercel project serves FastAPI from the repository root through `index.py`;
+  another builds `frontend/`. The API build seeds a persistent database. Configure allowed
+  frontend origins and the frontend's API URL as described in the README.
 
-**Units.** Every weight, exposure, drift and effect is a **fraction** in code, DB and API (0.07 = 7%). Only the frontend converts to % or percentage points (pp). Compute in float64, compare in tests with `math.isclose(..., abs_tol=1e-9)`, and round only for display.
+## 4. Data, units and source selection
 
-**Sources.**
-1. `data/sample/`: the synthetic fixtures in §10. The app must run fully offline on these. They are the backbone of the tests and the guaranteed demo.
-2. One real active ETF with daily holdings disclosure. Default is ARK Innovation ETF (ARKK); see M6.
-   - Issuer files update on trading days only, and usually show only the current day.
-   - Real history therefore has to be accumulated by fetching daily, or recovered from archives.
+**Units.** Every weight, exposure, drift and effect is a **fraction** in code, DB and API
+(`0.07` = 7%). Only the frontend converts to percentages or percentage points (pp). Compute
+in float64, compare tests with `math.isclose(..., abs_tol=1e-9)`, and round for display.
+Dollar holdings are entered in the planner; saved allocation weights sum to 1 when nonempty.
 
-**Sectors.**
-- Do not rely on issuer files for sectors. Sector comes from `data/reference/sectors.csv` (`security_id,sector`), which we maintain.
-- The mapping is applied at analysis time to both snapshots, so editing it never shows up as portfolio drift.
-- If an issuer file has a sector column, store it as `source_sector`.
-- Precedence: reference mapping → `source_sector` → `"Unknown"`.
-- `Unknown` is a real bucket shown in the UI. It is never dropped.
+**Catalog versus coverage.** `data/reference` contains a dated Nasdaq ETF catalog used for
+search. A searchable fund may have no holdings and remains visibly marked as missing. Bundled
+local data includes the catalog, ARKK issuer holdings, and synthetic DEMO, SPLT and FLOWTEST
+fixtures. iShares and SEC N-PORT snapshots can be imported separately. The app attempts a
+bounded TickerInside lookup when a newly added fund lacks stored provider holdings.
 
-## 5. Schema
+**Source selection.** For each fund, choose its latest stored issuer/SEC snapshot unless a
+TickerInside snapshot is strictly newer or is the only source. On equal dates, keep the
+issuer/SEC snapshot. Never merge rows from different sources within a selected fund snapshot.
+Record the selected source and holdings date. TickerInside snapshots carry weights without
+shares or market values; issuer/SEC rows use positive market values for sector-mix weights.
 
-- **`funds`**: `id, ticker UNIQUE, name, issuer, created_at`. Seeded from `data/reference/funds.csv`.
-- **`snapshots`**: `id, fund_id, as_of_date, source_url, source_file, content_hash, row_count, ingested_at`, with UNIQUE(fund_id, as_of_date).
-- **`holdings`**: `id, snapshot_id, security_id, ticker, name, asset_class, source_sector NULL, shares, price, market_value, reported_weight NULL`, with UNIQUE(snapshot_id, security_id).
-  - `asset_class` ∈ {`equity`, `cash`, `other`}.
-  - `price = market_value / shares` when the file doesn't provide it and shares > 0.
-- **`import_log`**: `id, fund_id, as_of_date, source_file, content_hash, outcome, message, created_at`.
-  - `outcome` ∈ {`inserted`, `duplicate_noop`, `conflict_rejected`, `replaced`, `invalid_rejected`}.
-- **`security_sectors`**: `security_id PRIMARY KEY, sector`. Reloaded from CSV on every ingest and on API startup.
+**Sectors.** The planner resolves issuer/SEC equity rows from `security_sectors`, then the
+issuer label, then `data/reference/name_sectors.csv`, then the sector assigned to the same
+security ID in an eligible ETF. Unresolved equities are `Unclassified`. Non-equity positive
+value rows are `Cash & other`. For TickerInside weights, resolve the ticker from stored
+issuer/SEC equity holdings and the ticker-sector reference; unknown symbols are unclassified.
+The original `/funds/...` holdings and change-analysis API retains its narrower
+`security_sectors` → issuer label → `Unknown` classification contract.
 
-There is **no `change_events` table.** Changes are computed on demand (§7, §8). Event IDs are deterministic, so the same comparison always yields the same events.
+**Prices.** Stored Alpaca IEX daily bars may be displayed beside provider holdings. They do
+not supply missing holding shares or market values and do not drive the sector mix. The
+configured GitHub Actions sync refreshes them once after market close on weekdays; no price
+fetch occurs during a planner request. Without configured credentials, no scheduled refresh
+occurs, and stored prices can be older.
 
-**Security IDs.**
-- Use the issuer's CUSIP or ISIN when present.
-- Non-equity rows without an ID get synthetic IDs such as `CASH:USD` or `OTHER:<normalized name>`.
-- An equity row without an ID falls back to `TICKER:<ticker>` and produces a validation warning.
+## 5. Persistence and identity
 
-## 6. Pipeline
+The SQLite or Postgres database has these principal tables:
 
-```
-python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_2026-10-16.csv [--adapter ark|sample] [--replace]
-```
+- `funds` and `etf_catalog`: registered funds and searchable ETF symbols.
+- `snapshots` and `holdings`: dated issuer/SEC snapshots and rows, including shares and
+  market values. A fund/date has one normalized snapshot.
+- `provider_holdings_snapshots` and `provider_holdings`: separate weight-only provider
+  snapshots; corrections on the same date may have different content hashes.
+- `security_prices`: dated Alpaca IEX OHLCV bars keyed by provider, feed, adjustment, ticker
+  and date.
+- `security_sectors` and the `data/reference` CSVs: maintained classification data.
+- `import_log`: normalized import result and provenance.
+- `portfolios`, `portfolio_funds`, `portfolio_preferences`: anonymous saved allocations,
+  dollar total and target mix. Portfolio IDs are readable through the API; only a hashed edit
+  key is stored. The raw key is returned only when the portfolio is created.
 
-Each stage is its own module in `backend/pipeline/`.
+Issuer/SEC `snapshots` are unique by fund and holdings date. Their normalized row hash makes
+identical re-imports `duplicate_noop`, conflicting same-date imports `conflict_rejected`, and
+explicit replacements `replaced`. Imports commit atomically. No `change_events` table exists;
+comparison events are computed on demand with stable IDs.
 
-**1. Adapter (ingest).** `adapters/sample.py` and `adapters/ark.py`.
-- Each adapter maps one file format to normalized rows: `as_of_date, fund, security_id, ticker, name, asset_class, source_sector, shares, price, market_value, reported_weight`.
-- Each adapter declares its source weight unit (percent or fraction) and converts to fraction.
+Use issuer CUSIP or ISIN when available. Equity without an ID uses `TICKER:<ticker>` with a
+validation warning; non-equity rows without an ID receive a synthetic ID. Keep ticker, source
+address, as-of date, hash and import time for traceability.
 
-**2. Validate.** Reject with a clear message (file, row number, field) on:
-- missing required columns, or empty required fields
-- more than one `as_of_date` in a file, or an unparseable date
-- a fund ticker not present in `funds.csv`
-- an equity row with negative shares or market_value. Supported scope is long-only equity; cash and other rows may be negative and are excluded from analytics.
-- a duplicate `security_id` within one snapshot. Never aggregate silently.
-- sum of reported weights outside 90%–110%
+## 6. Ingestion and refresh
 
-Warn but accept when:
-- the sum of reported weights is outside 97%–103%
-- |reported_weight − market-value-derived weight| > 0.1pp for any row
+`scripts/seed_db.py` loads the committed catalog and issuer files during API deployment.
+`make demo` resets an explicitly selected local database, loads sample and raw files, and
+starts the API. Never run the reset command against a database with portfolios to preserve.
 
-**3. Normalize.** Trim strings, uppercase tickers, compute price if missing, assign synthetic IDs.
+The adapter interface in `backend/pipeline/adapters` handles local sample, ARK and iShares
+CSV files. Validation rejects missing required fields, mixed holdings dates, wrong funds,
+negative equity shares/value, duplicate security IDs, and reported-weight totals outside
+90%–110%. It warns outside 97%–103% or when a row's reported weight differs from its
+market-value weight by more than 0.1 pp. Normalize strings, uppercase tickers, convert weight
+units to fractions, and hash normalized rows before storing. `scripts/ingest_nport.py`
+imports selected SEC filings and the series/class mapping; it must not infer unsupported
+shares or market values. See `docs/etf-sources.md` for source-specific commands.
 
-**4. Load.** Runs in a single transaction.
-- `content_hash` = sha256 of canonical JSON of the normalized rows, sorted by `security_id`, with numbers formatted to fixed precision. Whitespace, quoting or column-order differences in the raw file must not change the hash.
-- No snapshot for this fund/date → insert; outcome `inserted`.
-- Same hash already stored → write only an `import_log` row (`duplicate_noop`), exit 0, print `already ingested`.
-- Different hash stored → write only an `import_log` row (`conflict_rejected`), exit 2, print both hashes and how to use `--replace`.
-- `--replace` → delete the old snapshot and its holdings, insert the new one in the same transaction, log `replaced`.
-- Any failure → full rollback. No partial snapshot may exist.
+TickerInside holdings can be fetched on first use or refreshed with
+`scripts/sync_market_data.py`. The scheduled workflow refreshes saved-portfolio funds on
+weekdays when database and Alpaca secrets are present. Prices use Alpaca's IEX feed with
+`adjustment=all` and are stored independently. Provider failures leave existing issuer/SEC
+coverage available. See `docs/provider-market-data.md` for operational details and limits.
 
 ## 7. Analytics (the core — read carefully)
 
@@ -219,52 +246,49 @@ Return a list of caveat strings. Add one when:
 - the flow factor fell back to 1.0
 - any `Unknown` sector weight is greater than 0
 
-## 8. API
+## 8. API and planner contract
 
-- `GET /health` → `{status, db, fund_count, snapshot_count}`
-- `GET /funds` → funds with snapshot counts and latest `as_of_date`
-- `GET /funds/{ticker}/snapshots` → dates with `source_url, content_hash, row_count, ingested_at`
-- `GET /funds/{ticker}/holdings?date=YYYY-MM-DD` → normalized rows, resolved sector, and snapshot metadata. This is the "view underlying data" endpoint.
-- `GET /funds/{ticker}/changes?from=&to=` → the full comparison. `from` is a Python keyword, so declare it with `Query(alias="from")`.
+`GET /health` reports database status, fund count, issuer/SEC snapshot count, and the
+optional deployed commit. Fund and catalog routes include `GET /funds`, `/funds/{ticker}`,
+`/funds/{ticker}/snapshots`, `/funds/{ticker}/holdings`, `/etfs/search`, and
+`/etfs/covered`, and `POST /funds/{ticker}/simulate`. A catalog search result may still have no holdings.
 
-Response shape for `/changes` (the zeros show types only; the real values for DEMO are in §10):
+`POST /plan` accepts dollar-denominated `holdings`, an optional sector target (fractions),
+`cash_change`, and `max_new_funds` (0–5, default 2). The browser sends `cash_change: 0`;
+the API also supports contributions and withdrawals. The response includes fund coverage,
+source/date, current mix, target, distance and up to two distinct plan types. Missing funds
+remain visible, outside the normalized covered mix and proposed moves.
 
-```json
-{
-  "fund": "DEMO",
-  "config_version": "1",
-  "from": {"as_of_date": "2026-10-01", "source_url": "", "source_file": "", "content_hash": "", "row_count": 0},
-  "to":   {"as_of_date": "2026-10-02", "source_url": "", "source_file": "", "content_hash": "", "row_count": 0},
-  "snapshot_intervals": 1,
-  "flow_factor": 0,
-  "cash_weight": {"from": 0, "to": 0},
-  "summary": {
-    "holdings_from": 0, "holdings_to": 0,
-    "added": 0, "removed": 0, "increased": 0, "decreased": 0,
-    "top_n": 10,
-    "top_n_share": {"from": 0, "cf": 0, "to": 0},
-    "hhi": {"from": 0, "cf": 0, "to": 0}
-  },
-  "sectors": [
-    {"sector": "", "w_from": 0, "w_cf": 0, "w_to": 0, "drift": 0,
-     "price_effect": 0, "activity_effect": 0, "activity_direct": 0, "activity_dilution": 0}
-  ],
-  "holdings": [
-    {"security_id": "", "ticker": "", "name": "", "sector": "", "status": "", "traded": false,
-     "shares_from": 0, "shares_to": 0, "adj_share_change": 0,
-     "price_from": 0, "price_to": 0, "price_estimated": false,
-     "w_from": 0, "w_cf": 0, "w_to": 0, "price_effect": 0, "activity_effect": 0, "flags": []}
-  ],
-  "events": [
-    {"id": "", "type": "", "subject": "", "magnitude": 0, "description": "", "contributing_security_ids": []}
-  ],
-  "caveats": []
-}
-```
+The planner's distance is `½ × Σ |current[s] − target[s]|` in fractional units. It optimizes
+squared sector differences with a small preference for fewer moves, using the existing
+covered dollars. A plan may rearrange held ETFs or rearrange and add allowlisted ETFs whose
+mix is at least 80% classified. A held ETF outside the allowlist may be kept or reduced but
+not increased; synthetic fixtures are never proposed as additions. Consider the top 12 new
+candidates; add them one at a time only when each lowers distance by at least 0.5 pp. Prune
+small positions below 1%, round amounts to dollars while conserving the portfolio total,
+and omit unchanged, duplicate or non-improving plans. A valid rearrangement can improve by
+less than 0.5 pp.
 
-Notes:
-- `snapshot_intervals` = number of stored snapshots for the fund with `from < as_of_date ≤ to`. Adjacent snapshots give 1.
-- Errors: 404 for an unknown fund or a date with no snapshot; 422 when `from ≥ to`.
+`POST /chat` translates user language into a target mix. With `ANTHROPIC_API_KEY`, Scythe
+uses the model configured in `backend/app/assistant.py`; otherwise or on a supported API
+error, it uses the rule-based reader. It receives the message, recent conversation, current
+mix, target and portfolio total, but no ETF list supplied automatically. User messages may
+include information they choose to type. Scythe changes only the target; it never
+chooses one, recommends an ETF, or changes the money available to the planner. Sliders work
+independently of Scythe.
+
+`POST /portfolios` creates a saved portfolio and returns an edit key. `GET /portfolios/{id}`
+reads it; `PUT` and `DELETE` require `X-Portfolio-Edit-Key`. Preferences are under
+`/portfolios/{id}/preferences`. `/portfolios/{id}/latest` and `/analysis` expose selected
+holdings, sources, coverage, sectors and overlap. `/portfolios/preview` and
+`/portfolios/{id}/preview` calculate hypothetical analysis without saving. Anyone with the
+portfolio ID can read it; a browser without the edit key saves edits as a copy.
+
+`POST /provider-data/funds/{ticker}/sync` fetches TickerInside holdings only if no provider
+snapshot is stored. `/provider-data/funds/{ticker}/holdings` returns the latest reported
+weights and changes between provider dates. `/provider-data/prices` returns stored Alpaca
+IEX bars. `/funds/{ticker}/changes?from=...&to=...` retains the original share-count-based
+price/activity decomposition from §7, independent of provider weight-only rows.
 
 ## 9. Language rules (UI copy and event descriptions)
 
@@ -274,9 +298,9 @@ Notes:
 - Weight differences are "pp" (percentage points), never "%".
 - Any drift number is shown with its price/activity split next to it.
 - Description template: `Health Care exposure +5.0 pp (price −2.8 pp, portfolio activity +7.8 pp)`.
-- Footer on every page: "Derived from issuer-published holdings snapshots. Not investment advice."
+- Footer on every page: "Based on dated ETF holdings. Not investment advice."
 
-## 10. Golden fixtures (write the tests from these BEFORE implementing)
+## 10. Golden fixtures and regression values
 
 ### Reference files
 
@@ -419,120 +443,69 @@ Expected:
 - 404 for an unknown fund, and for a date with no snapshot.
 - Event IDs are identical across two calls, and across a re-ingest.
 
-## 11. Milestones
+## 11. Verification
 
-### M0 — Setup (≤ 30 min)
+Run checks from the repository root after setup:
 
-- Create the repo layout (§12), `CLAUDE.md`, `Makefile`, and README stub.
-- Timeboxed reconnaissance, 20 minutes maximum:
-  - Try to download one real ARKK holdings file into `data/raw/`.
-  - Print its header and first 5 rows.
-  - Record the actual columns in `CLAUDE.md`.
-  - Do not assume any column names. If the download fails, note why and move on; never block on it.
+```bash
+make test
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
 
-Acceptance: `make test` exits 0.
-
-### M1 — Fixtures and tests first
-
-- Write every CSV and every test in §10.
-- Analytics and pipeline functions exist but raise `NotImplementedError`.
-
-Acceptance: `pytest` collects every test, and they fail with `NotImplementedError`, not with import or syntax errors.
-
-### M2 — Analytics
-
-Implement §7 as pure functions.
-
-Acceptance: `pytest backend/tests/test_analytics.py` is green.
-
-### M3 — Pipeline and DB
-
-Implement §5 and §6.
-
-Acceptance:
-- `make ingest-sample` run twice; the second run prints `already ingested`.
-- `pytest backend/tests/test_pipeline.py` is green.
-
-### M4 — API
-
-Implement §8.
-
-Acceptance:
-- `pytest backend/tests/test_api.py` is green.
-- After `make demo`, `curl "localhost:8000/funds/DEMO/changes?from=2026-10-01&to=2026-10-02"` returns the §10 values.
-
-### M5 — Frontend (single page)
-
-Components:
-- **FundSelector**
-- **DateRangeSelector**: only offers dates that have snapshots.
-- **SummaryCards**: added / removed / increased / decreased counts, plus top-N and HHI, each with its price/activity split.
-- **SectorChart**: Recharts horizontal stacked bars per sector showing the price effect and activity effect, labeled with net drift.
-- **HoldingsTable**: status, shares from→to, flow-adjusted change, weight from→to, price effect, activity effect, flags. Sorted by abs(weight change) by default.
-- **EventList**: clicking an event highlights its contributing rows in HoldingsTable and scrolls to them.
-- **SourceInfo**: both snapshots' dates, source URLs, content hashes, and a link to the `/holdings` JSON.
-- **CaveatsBanner**
-- Loading, error and empty states.
-
-Use Tailwind defaults. No design-system work.
-
-Acceptance:
-- `npm run build` passes.
-- With `make demo` and `npm run dev` running, selecting DEMO 10-01 → 10-02 shows 6 events, and clicking the BBB event highlights the BBB row.
-
-### M6 — Real data (ARKK)
-
-- Write `backend/pipeline/adapters/ark.py` against the actual columns observed in M0.
-- Write `scripts/fetch_holdings.py --fund ARKK`. It downloads the current file and saves it as `data/raw/ARKK_<as_of_date>.csv`, using the date inside the file rather than today's date.
-- Seed `sectors.csv` for ARKK's holdings. These are team-assigned categories; say so in the README.
-- Check whether archived past copies of the source URL exist (for example, in the Internet Archive). If they do, ingest up to two.
-- If no history is reachable, document in the README: "Run `fetch_holdings.py` on two different trading days, then ingest both."
-
-Acceptance:
-- One real file ingests, and re-ingesting it is a no-op.
-- If 2 or more real snapshots exist, `/changes` works for ARKK and the UI shows it.
-
-### M7 — Deploy (optional)
-
-Only if everything above is done.
+Behavioral changes require regression tests at the relevant boundary: pure planner tests for
+allocation rules, route tests for source selection and missing data, and API tests for saving,
+edit-key protection, and share-copy behavior. Keep the §10 fixtures and decomposition checks.
+Verify the built pages and the complete planner flow in a browser when changing the interface.
 
 ## 12. Repository layout
 
-```
+```text
 backend/
-  app/          main.py, db.py, models.py, schemas.py, routes/
-  pipeline/     adapters/{sample.py, ark.py}, validate.py, normalize.py, load.py
-  analytics/    config.py, weights.py, decompose.py, sectors.py, concentration.py, events.py
-  tests/        test_analytics.py, test_pipeline.py, test_api.py, conftest.py
+  analytics/    Sector mixes, allocation plans, holdings decomposition and portfolio aggregation
+  app/          FastAPI routes, request/response schemas, SQLAlchemy models, Scythe
+  pipeline/     Adapters, validation, normalization, source fetching and ingestion
+  tests/        Analytics, pipeline, planner, assistant and API regression suites
 frontend/
+  app/          Landing (/), methodology (/methodology), planner (/app)
+  components/   Marketing and planner components
+  lib/          API clients, saving, sector helpers and branding
 data/
-  sample/       demo_2026-10-01.csv, demo_2026-10-02.csv, demo_2026-10-03.csv, splt_*.csv, flow_*.csv
-  raw/
-  reference/    funds.csv, sectors.csv
-scripts/        run_pipeline.py, fetch_holdings.py
-Makefile
-CLAUDE.md
-README.md
-requirements.txt
+  sample/       DEMO, SPLT and FLOWTEST fixtures
+  raw/          Committed issuer files
+  reference/    ETF catalog, fund metadata and maintained classification references
+docs/           Source-ingestion and API contracts
+scripts/        Fetching, ingestion, catalog refresh and seeding
 ```
 
-## 13. Demo script (the definition of done)
+## 13. Product acceptance flow
 
-1. `make demo` from a clean checkout, with no network.
-2. Open DEMO, 10-01 → 10-02:
-   - Technology's net drift is 0.0 pp, but it hides +5.6 pp from price and −5.6 pp from dilution.
-   - Health Care is +5.0 pp, driven by an increased BBB position.
-   - CCC was removed and EEE was added.
-3. Click an event: its contributing holdings are highlighted, and the source snapshot data and content hashes are one click away.
-4. Re-run the ingest: it prints `already ingested`, and the event IDs are identical.
-5. Open SPLT: FFF's share count doubled, but it is flagged as a suspected split, not reported as an increased position.
-6. Open FLOWTEST: every share count rose 10%, and there are no events, because that was fund flow.
-7. If real ARKK snapshots exist, switch to ARKK.
+1. Run `make setup`, then start the explicitly local demo database and frontend using the README.
+2. Open `/` and `/methodology`; the product name, workflow, formulas and limitations agree with
+   the planner and this specification.
+3. Open `/app`, add ARKK and enter a dollar amount. Inspect its sector mix and source date.
+   The bundled demo does not include IVV or IYW issuer snapshots; the example portfolio's
+   coverage depends on the data available in the selected environment.
+4. Set a target with sliders and a supported plain-language request. The total is 100%; Scythe
+   reports the changes, and the planner honors its fund constraints and available coverage.
+5. Preview a plan with “Use these amounts.” Reopen the saved URL in the owning browser; the
+   amounts and target persist. In a browser without the edit key, edits create a separate copy.
+6. Verify the retained change-analysis API against §10, including DEMO's price/activity split,
+   SPLT's suspected corporate action, and FLOWTEST's creation/redemption adjustment.
+7. Re-ingest an identical snapshot; its outcome is `duplicate_noop` (the command prints
+   `already ingested`), and change-event IDs stay stable.
 
-## 14. Known limitations (copy into README)
+## 14. Limitations
 
-- Snapshot diffs can't see trades that reversed within the period.
-- The median flow factor misreads periods where the manager changes most positions in the same direction.
-- Removed holdings use the earlier price in the counterfactual.
-- Split detection is a heuristic. Mergers, spin-offs and ticker reuse are not modeled.
-- Sector labels are team-assigned, not an official classification.
+- Holdings and classifications can be incomplete or dated. A searchable ETF is not necessarily
+  covered. Missing funds remain visible and are excluded from planner calculations.
+- The planner normalizes the covered portion of the portfolio; the portfolio-analysis API keeps
+  missing allocations in its coverage denominator. These are different explicitly labeled views.
+- Available ETFs and plan constraints may prevent an exact target match. Plans omit taxes,
+  fees, transaction costs, bid-ask spreads and whole-share constraints.
+- Sector labels are maintained or issuer-provided classifications, not one official taxonomy.
+- Snapshot comparisons cannot reveal activity reversed between dates. The median flow factor
+  can misread broad position changes; removed holdings reuse earlier prices; split detection is
+  heuristic. Mergers, spin-offs and ticker reuse are not modeled.
+- Portfolio links permit reading by anyone who has the ID. Only possession of the edit key
+  permits changes to that portfolio; losing the key cannot be reversed through an account.
