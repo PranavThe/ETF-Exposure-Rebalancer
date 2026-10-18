@@ -35,6 +35,12 @@ class SectorWeight(BaseModel):
     weight: float
 
 
+class FundFee(BaseModel):
+    expense_ratio: float  # a fraction a year: 0.0003 = 0.03%
+    as_of: date | None  # date of the filing it comes from
+    source_url: str
+
+
 class PlanFund(BaseModel):
     ticker: str
     name: str
@@ -44,6 +50,7 @@ class PlanFund(BaseModel):
     as_of_date: date | None
     source_provider: str | None = None
     source_layer: str | None = None
+    fee: FundFee | None = None
     sectors: list[SectorWeight]
 
 
@@ -66,6 +73,9 @@ class PlanOut(BaseModel):
     exposure: list[SectorWeight]
     moves: list[MoveOut]
     new_funds: list[str]
+    fee_before: float  # dollars a year in fund fees, for the funds whose fee is known
+    fee_after: float
+    fee_known_after: float  # dollars after the plan whose fee is known
 
 
 class PlanResult(BaseModel):
@@ -75,6 +85,8 @@ class PlanResult(BaseModel):
     current: list[SectorWeight]
     target: list[SectorWeight] | None
     distance: float | None
+    yearly_fee: float  # dollars a year in fund fees now, for the funds whose fee is known
+    fee_known: float  # dollars whose fee is known
     plans: list[PlanOut]
 
 
@@ -86,6 +98,7 @@ class CoveredEtf(BaseModel):
     source_provider: str
     source_layer: str | None = None
     sample: bool
+    fee: FundFee | None = None
     sectors: list[SectorWeight]
 
 

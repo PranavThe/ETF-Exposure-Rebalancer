@@ -321,3 +321,114 @@ def test_options_on_a_stock_do_not_make_it_cash(client, allow):
         session.add(ProviderHolding(snapshot_id=snapshot.id, ticker="AAPL", weight=1.0))
     covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
     assert mix(covered["WTOPT"]["sectors"]) == {"Technology": 1.0}
+
+
+def test_plans_report_yearly_fees_before_and_after(client, allow):
+    from backend.app.main import app
+    from backend.app.routes.plans import fund_fees
+
+    allow("TECHX", "HLTHX")
+    add_fund("TECHX", {"Information Technology": 100})
+    add_fund("HLTHX", {"Health Care": 100})
+    fee = lambda ratio: {"expense_ratio": ratio, "as_of": "2026-04-28", "source_url": "https://www.sec.gov/x"}
+    app.dependency_overrides[fund_fees] = lambda: {"TECHX": fee(0.004), "HLTHX": fee(0.001)}
+    try:
+        body = client.post("/plan", json={
+            "holdings": [{"ticker": "TECHX", "amount": 10000}],
+            "target": {"Technology": 0.5, "Health Care": 0.5}, "max_new_funds": 1}).json()
+        assert close(body["yearly_fee"], 40) and close(body["fee_known"], 10000)
+        assert body["funds"][0]["fee"]["expense_ratio"] == 0.004
+        plan = next(p for p in body["plans"] if p["kind"] == "rearrange_with_new")
+        # Half moves to the 0.1% fund: $20 + $5 a year instead of $40.
+        assert close(plan["fee_before"], 40) and close(plan["fee_after"], 25)
+        assert close(plan["fee_known_after"], 10000)
+        covered = {e["ticker"]: e for e in client.get("/etfs/covered").json()}
+        assert covered["HLTHX"]["fee"]["source_url"] == "https://www.sec.gov/x"
+    finally:
+        app.dependency_overrides.pop(fund_fees, None)
+
+
+def test_companies_add_up_across_funds_and_overlaps(client, allow):
+    allow("BIGA", "BIGB", "TICKC")
+    add_holdings("BIGA", [("SA1", "APPLE INC", "Information Technology", 600),
+                          ("SA2", "MICROSOFT CORP", "Information Technology", 400)])
+    add_holdings("BIGB", [("SB1", "APPLE INC", "Information Technology", 500),
+                          ("SB2", "EXXON MOBIL CORP", "Energy", 500)])
+    with Session(get_engine()) as session, session.begin():
+        session.add(Fund(ticker="TICKC", name="Weights Only", issuer="Test Issuer"))
+        snapshot = ProviderHoldingsSnapshot(
+            provider="tickerinside", fund_ticker="TICKC", fund_name="Weights Only",
+            as_of_date=date(2026, 10, 17), source_layer="issuer", source_url="https://example.test",
+            cite_as="TickerInside", content_hash="provider-tickc")
+        session.add(snapshot)
+        session.flush()
+        session.add_all([ProviderHolding(snapshot_id=snapshot.id, ticker="AAPL", weight=0.8),
+                         ProviderHolding(snapshot_id=snapshot.id, ticker="912828XX", weight=0.2)])
+
+    body = client.post("/exposure/companies", json={"holdings": [
+        {"ticker": "BIGA", "amount": 1000}, {"ticker": "BIGB", "amount": 1000}, {"ticker": "TICKC", "amount": 500}]}).json()
+    apple = body["companies"][0]
+    # $600 + $500 + $400 (80% of $500): the filing's "APPLE INC" and the provider's AAPL are one company.
+    assert apple["ticker"] == "AAPL" and close(apple["amount"], 1500) and close(apple["share"], 0.6)
+    assert [f["ticker"] for f in apple["funds"]] == ["BIGA", "BIGB", "TICKC"]
+    assert {c["ticker"] for c in body["companies"]} == {"AAPL", "MSFT", "XOM"}  # the bond row is left out
+    pair = {(o["a"], o["b"]): o["overlap"] for o in body["overlaps"]}
+    assert close(pair[("BIGA", "BIGB")], 0.5) and close(pair[("BIGA", "TICKC")], 0.6)
+    assert close(body["top10_share"], (1500 + 400 + 500) / 2500)
+
+
+def test_explanations_from_rules_and_from_gemini(client, allow):
+    import json as jsonlib
+    from types import SimpleNamespace
+
+    from google.genai import errors
+
+    from backend.app import explain, llm
+    from backend.app.main import app
+
+    allow("TECHX", "HLTHX")
+    add_fund("TECHX", {"Information Technology": 100})
+    add_fund("HLTHX", {"Health Care": 100})
+    request = {"holdings": [{"ticker": "TECHX", "amount": 10000}], "target": {"Technology": 0.5, "Health Care": 0.5},
+               "max_new_funds": 1, "kind": "rearrange_with_new"}
+
+    app.dependency_overrides[llm.get_client] = lambda: None
+    try:
+        body = client.post("/explain/plan", json=request).json()
+        assert body["source"] == "rules" and "50.0% match" in body["summary"]
+        assert {m["ticker"] for m in body["moves"]} == {"TECHX", "HLTHX"}
+        assert any("tax" in c for c in body["consider"])
+        etf = client.post("/explain/etf", json={"ticker": "techx"}).json()
+        assert etf["source"] == "rules" and "Technology (100.0%)" in etf["summary"]
+        assert client.post("/explain/plan", json={**request, "kind": "nope"}).status_code == 404
+        assert client.post("/explain/etf", json={"ticker": "NOPE"}).status_code == 404
+    finally:
+        app.dependency_overrides.pop(llm.get_client, None)
+
+    calls = []
+
+    def answer(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(text=jsonlib.dumps({
+            "summary": "You would sell half of TECHX.", "consider": ["Taxes may apply."],
+            "moves": [{"ticker": "HLTHX", "why": "It holds health care."}, {"ticker": "MADEUP", "why": "x"}]}))
+
+    explain._cache.clear()
+    app.dependency_overrides[llm.get_client] = lambda: SimpleNamespace(models=SimpleNamespace(generate_content=answer))
+    try:
+        body = client.post("/explain/plan", json=request).json()
+        assert body["source"] == "gemini" and body["summary"] == "You would reduce half of TECHX."
+        assert [m["ticker"] for m in body["moves"]] == ["HLTHX"]  # moves Gemini made up are dropped
+        facts = jsonlib.loads(calls[0]["contents"][0]["parts"][0]["text"])
+        assert facts["match_now"] == 0.5 and facts["fees"]["known_share"] == 0
+        client.post("/explain/plan", json=request)
+        assert len(calls) == 1  # the same facts are answered from the cache
+
+        def broken(**kwargs):
+            raise errors.ServerError(503, {"error": {"code": 503, "message": "busy"}})
+        explain._cache.clear()
+        app.dependency_overrides[llm.get_client] = lambda: SimpleNamespace(models=SimpleNamespace(generate_content=broken))
+        assert client.post("/explain/etf", json={"ticker": "HLTHX"}).json()["source"] == "rules"
+    finally:
+        app.dependency_overrides.pop(llm.get_client, None)
+        explain._cache.clear()

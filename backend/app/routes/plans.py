@@ -24,9 +24,11 @@ from backend.analytics.rebalance import (
     normalize_target,
     sector_order,
     suggestable,
+    yearly_fee,
 )
 from backend.analytics.sectors import resolve_sector
-from backend.pipeline.reference import normalize_symbol, read_name_sectors, read_ticker_sectors
+from backend.pipeline.reference import (normalize_symbol, read_expense_ratios, read_name_sectors,
+                                        read_ticker_sectors)
 
 from ..db import get_session
 from ..models import (Fund, Holding, PortfolioPreference, ProviderHolding, ProviderHoldingsSnapshot,
@@ -49,6 +51,16 @@ def suggestable_etfs() -> frozenset[str]:
 def name_sectors() -> NameSectors:
     """Company name -> sector, for holdings without one (data/reference/name_sectors.csv)."""
     return NameSectors(read_name_sectors())
+
+
+def fund_fees() -> dict[str, dict]:
+    """ETF ticker -> its expense ratio and source (data/reference/expense_ratios.csv); tests override this."""
+    return _expense_ratios()
+
+
+@cache
+def _expense_ratios() -> dict[str, dict]:
+    return read_expense_ratios()
 
 
 @cache
@@ -261,11 +273,11 @@ def sector_list(mix: dict[str, float]) -> list[dict]:
 
 @router.get("/etfs/covered", response_model=list[CoveredEtf])
 def covered_etfs(session: Session = Depends(get_session),
-                 allow: frozenset[str] = Depends(suggestable_etfs)):
+                 allow: frozenset[str] = Depends(suggestable_etfs), fees: dict = Depends(fund_fees)):
     """The allowlisted ETFs (and local sample funds) with holdings data, and their sector mixes."""
     return [
         {"ticker": ticker, "name": fund.name, "issuer": fund.issuer, "as_of_date": as_of,
-         "source_provider": provider, "source_layer": layer,
+         "source_provider": provider, "source_layer": layer, "fee": fees.get(ticker),
          "sample": fund.issuer == SAMPLE_ISSUER, "sectors": sector_list(mix)}
         for ticker, (fund, as_of, mix, provider, layer) in sorted(
             load_universe(session, (), allow, include_samples=True).items())
@@ -274,7 +286,7 @@ def covered_etfs(session: Session = Depends(get_session),
 
 @router.post("/plan", response_model=PlanResult)
 def plan(body: PlanIn, session: Session = Depends(get_session),
-         allow: frozenset[str] = Depends(suggestable_etfs)):
+         allow: frozenset[str] = Depends(suggestable_etfs), fees: dict = Depends(fund_fees)):
     """The portfolio's sector mix and, with a target, up to two plans that move it there."""
     amounts: dict[str, float] = {}
     for h in body.holdings:
@@ -302,6 +314,7 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
         fund = universe[ticker][0] if ticker in universe else names.get(ticker)
         return fund.name if fund else ticker
 
+    ratios = {t: f["expense_ratio"] for t, f in fees.items()}
     plans = []
     if target is not None:
         # Held ETFs of any kind count; new ones come only from the allowlist, never sample funds.
@@ -311,10 +324,14 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
         no_increase = {t for t in amounts if t not in allow or t in samples}
         for p in build_plans(amounts, weights, target, body.cash_change, body.max_new_funds, never,
                              no_increase):
+            # Fees compare the same money: the funds the plan works with, before and after.
+            fee_before = yearly_fee({t: a for t, a in amounts.items() if t in weights}, ratios)[0]
+            fee_after, known_after = yearly_fee(p.allocation, ratios)
             plans.append({
                 "kind": p.kind, "title": p.title, "summary": p.summary,
                 "total_before": p.total_before, "total_after": p.total_after, "distance": p.distance,
                 "exposure": sector_list(p.exposure), "new_funds": p.new_funds,
+                "fee_before": fee_before, "fee_after": fee_after, "fee_known_after": known_after,
                 "moves": [{"ticker": m.ticker, "name": fund_name(m.ticker), "action": m.action,
                            "amount": m.amount, "before": m.before, "after": m.after} for m in p.moves],
             })
@@ -328,12 +345,15 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
              "as_of_date": universe[t][1] if t in universe else None,
              "source_provider": universe[t][3] if t in universe else None,
              "source_layer": universe[t][4] if t in universe else None,
+             "fee": fees.get(t),
              "sectors": sector_list(universe[t][2]) if t in universe else []}
             for t, a in amounts.items()
         ],
         "current": sector_list(current),
         "target": sector_list(target) if target is not None else None,
         "distance": distance(current, target) if target is not None and current else None,
+        "yearly_fee": yearly_fee(amounts, ratios)[0],
+        "fee_known": yearly_fee(amounts, ratios)[1],
         "plans": plans,
     }
 

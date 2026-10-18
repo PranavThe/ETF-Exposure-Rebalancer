@@ -15,6 +15,7 @@ from backend.analytics.rebalance import (
     normalize_target,
     solve_mix,
     suggestable,
+    yearly_fee,
 )
 
 from .golden import close
@@ -229,3 +230,8 @@ def test_rounding_never_leaves_a_dollar_in_a_removed_fund():
     assert out["OLD"] == 0.0
     assert math.isclose(sum(out.values()), 10000.0, abs_tol=1e-9)
     assert all(v >= 0 for v in out.values())
+
+
+def test_yearly_fee_counts_only_funds_with_a_known_fee():
+    fee, known = yearly_fee({"A": 10000, "B": 5000, "C": 0}, {"A": 0.0003, "C": 0.01})
+    assert close(fee, 3) and close(known, 10000)

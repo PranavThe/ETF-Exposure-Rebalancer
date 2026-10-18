@@ -1,6 +1,7 @@
 """Reference data we maintain: data/reference/funds.csv, sectors.csv and name_sectors.csv."""
 
 import csv
+from datetime import date
 from pathlib import Path
 
 from sqlalchemy import select
@@ -41,6 +42,17 @@ def read_name_sectors() -> dict[str, str]:
         return {}
     return {r["normalized_name"]: r["sector"] for r in _read("name_sectors.csv")
             if r["normalized_name"] and r["sector"]}
+
+
+def read_expense_ratios() -> dict[str, dict]:
+    """ETF ticker -> {"expense_ratio": fraction a year, "as_of": date or None, "source_url": str},
+    from expense_ratios.csv (scripts/fetch_expense_ratios.py). Empty if the file is missing."""
+    if not (REFERENCE_DIR / "expense_ratios.csv").exists():
+        return {}
+    return {r["ticker"].upper(): {"expense_ratio": float(r["expense_ratio"]),
+                                  "as_of": date.fromisoformat(r["as_of"]) if r["as_of"] else None,
+                                  "source_url": r["source_url"]}
+            for r in _read("expense_ratios.csv") if r["ticker"] and r["expense_ratio"]}
 
 
 # iShares files of foreign stocks, whose tickers are local exchange codes: COR is Cencora in New
@@ -91,3 +103,18 @@ def sync_reference(session: Session) -> None:
             existing_sectors[security_id].sector = sector
         else:
             session.add(SecuritySector(security_id=security_id, sector=sector))
+
+
+def read_company_tickers() -> tuple[dict[str, str], dict[str, str]]:
+    """(normalized company name -> ticker, ticker -> company name) from name_sectors.csv, with the
+    same rule as read_ticker_sectors: a U.S. listing wins over a foreign code with the same letters."""
+    by_name: dict[str, str] = {}
+    names: dict[str, str] = {}
+    if not (REFERENCE_DIR / "name_sectors.csv").exists():
+        return by_name, names
+    rows = [r for r in _read("name_sectors.csv") if r.get("ticker")]
+    for r in sorted(rows, key=lambda r: not set(r.get("funds", "").split()) <= NON_US_SOURCES):
+        symbol = normalize_symbol(r["ticker"])
+        by_name[r["normalized_name"]] = symbol
+        names[symbol] = r["name"]
+    return by_name, names

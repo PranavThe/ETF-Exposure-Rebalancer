@@ -117,6 +117,13 @@ def fund_sector_weights(rows: Iterable[Mapping]) -> dict[str, float]:
     return {s: v / grand for s, v in totals.items()} if grand > 0 else {}
 
 
+def yearly_fee(amounts: Mapping[str, float], ratios: Mapping[str, float]) -> tuple[float, float]:
+    """Dollars a year in fund fees for `amounts` (expense ratios are fractions), and the dollars
+    whose fee is known; funds without a known fee are left out of both."""
+    known = {t: a for t, a in amounts.items() if a > 0 and t in ratios}
+    return math.fsum(a * ratios[t] for t, a in known.items()), math.fsum(known.values())
+
+
 def classified_share(mix: Mapping[str, float]) -> float:
     """Share of a fund's mix with a known sector, Cash & other included."""
     return math.fsum(w for s, w in mix.items() if s != UNCLASSIFIED)

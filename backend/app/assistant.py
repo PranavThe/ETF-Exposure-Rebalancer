@@ -209,6 +209,7 @@ def _capped(mix: dict[str, float], cap: float) -> dict[str, float]:
 # The UI never says buy, sell or trade, or what anyone believes or thinks (SPEC §9). The prompt asks
 # for this, but a reply that refuses a request sometimes echoes the user's words, so swap them here.
 PLAIN_WORDS = [
+    (r"exchange-traded funds", "ETFs"), (r"exchange-traded fund", "ETF"), (r"exchange-traded", "listed"),
     (r"buy(?:ing)? (?:or|and) sell(?:ing)?", "pick"), (r"trade-offs", "compromises"), (r"trade-off", "compromise"),
     (r"bought", "added"), (r"buying", "adding"), (r"buys", "adds"), (r"buy", "add"),
     (r"sold", "reduced"), (r"selling", "reducing"), (r"sells", "reduces"), (r"sell", "reduce"),
