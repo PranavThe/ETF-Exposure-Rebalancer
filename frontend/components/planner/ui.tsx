@@ -102,23 +102,6 @@ export function Toasts({ toasts }: { toasts: Toast[] }) {
   );
 }
 
-/** The product mark: three rising strokes. */
-export function BrandMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <defs>
-        <linearGradient id="bm" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stopColor="#7a73f0" />
-          <stop offset="1" stopColor="#c9c6ff" />
-        </linearGradient>
-      </defs>
-      <path d="M4 19 L9 13" stroke="url(#bm)" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M8 20 L15 9" stroke="url(#bm)" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M13 20 L20 5" stroke="url(#bm)" strokeWidth="2.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`skeleton ${className}`} />;
 }
