@@ -1,10 +1,11 @@
 # ETF data sources and ingestion
 
-FundShift separates a **searchable ETF catalog** from **holdings coverage**. A listed ETF may
-have no holdings snapshot. Its portfolio row remains `missing` until a complete source file is
-ingested. This makes a broad selection UI possible without claiming unsupported analysis.
+Glean separates a **searchable ETF catalog** from **holdings coverage**. A listed ETF may
+have no holdings snapshot. Its portfolio row remains `missing` until issuer/SEC holdings are
+imported or a TickerInside lookup succeeds. This makes a broad selection UI possible without
+claiming unsupported analysis.
 
-## Sources in this branch
+## Sources
 
 | Source | Use | Official reference |
 |---|---|---|
@@ -13,12 +14,14 @@ ingested. This makes a broad selection UI possible without claiming unsupported 
 | SEC series/class report | Connect ETF tickers to N-PORT series IDs | [yearly CSVs](https://www.sec.gov/data-research/sec-markets-data/investment-company-series-class-information) |
 | iShares latest holdings CSV | Fresher holdings, values, weights, and issuer sectors for supported iShares funds | [example product page](https://www.ishares.com/us/products/239726/ishares-core-sp-500-etfUSdollars) |
 | ARK issuer CSV | Existing ARKK adapter | [existing source URL](https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv) |
+| TickerInside holdings | Weight-only holdings that may be fetched when a fund is added or by the weekday sync | [provider guide](provider-market-data.md) |
+| Alpaca IEX | Stored daily price bars shown alongside provider holdings; no live prices | [provider guide](provider-market-data.md) |
 
 The dated Nasdaq catalog CSV in `data/reference` is loaded by `scripts/seed_db.py` during an API
-build. SEC and issuer holdings remain **offline data operations**. Set `DATABASE_URL` to the
-intended database before running them.
-Without it, they use the local SQLite database. Do not point them at Neon until the team is ready
-to populate the shared database. The SEC source downloads are large and are ignored by Git.
+build. SEC and issuer imports are separate data operations. Set `DATABASE_URL` to the
+intended database before running them; without it, they use local SQLite. The SEC source
+downloads are large and are ignored by Git. The application can fetch TickerInside weights
+on first use, while the configured weekday sync updates provider holdings and stored IEX prices.
 
 ### 1. Register ETF symbols
 
@@ -31,8 +34,8 @@ This reads Nasdaq's `nasdaqlisted.txt` and `otherlisted.txt`, keeps rows marked 
 returns up to 100 matching entries. Existing curated fund names and issuers are preserved. The
 catalog may contain ETFs that N-PORT does not cover (for example, some commodity trusts).
 The committed catalog snapshot has 5,787 symbols as of 2026-10-17; refresh it deliberately as
-listings change. The existing Discover view requests only 24 funds with loaded snapshots, while
-the portfolio picker searches the full catalog.
+listings change. The planner's ETF picker searches the catalog and shows data availability;
+a search result alone does not mean its holdings are available for analysis.
 
 ### 2. Ingest SEC history for selected ETFs
 
@@ -40,7 +43,7 @@ Download an official quarter and the SEC's series/class CSV. The SEC asks automa
 identify a real contact in the User-Agent and [limit request rates](https://www.sec.gov/about/webmaster-frequently-asked-questions).
 
 ```bash
-export SEC_USER_AGENT='FundShift your-real-contact@example.com'
+export SEC_USER_AGENT='Glean your-real-contact@example.com'
 python scripts/download_sec_data.py --quarter 2026q3 --series-year 2026
 python scripts/ingest_nport.py \
   --zip data/vendor/sec/2026q3_nport.zip \
@@ -66,8 +69,8 @@ same `--zip` and `--series-classes` inputs plus `--output data/vendor/sec/eligib
 For these 2026 Q3 files, 4,200 catalog symbols have a unique series mapping and a public report;
 41 have ambiguous mappings and are excluded. Split the eligible list into manageable batches
 and pass each batch to `ingest_nport.py --tickers-file <path>`. The plan does not write to the
-database. Verify `DATABASE_URL` before importing into Neon; the checked-out branch currently
-does not include a Neon connection or Vercel project link.
+database. Verify `DATABASE_URL` before importing into a shared database; credentials and local
+deployment links are environment-specific and are not committed to Git.
 
 ### 3. Add fresher iShares snapshots
 
@@ -85,10 +88,12 @@ established confidently. Until then, unresolved IDs should remain separate.
 
 ## Source limits and selection
 
-The portfolio API selects the newest stored date separately for each fund. It never merges rows
-from two sources into one snapshot. N-PORT is broad and historical but delayed; issuer files can
+The planner and portfolio API use each fund's latest issuer/SEC snapshot unless a TickerInside
+snapshot is strictly newer or the only source. They never merge rows from two sources into one
+selected snapshot. N-PORT is broad and historical but delayed; issuer files can
 be fresher but differ by issuer. N-PORT does not provide a standard equity sector field, so those
-positions may show `Unknown` unless a maintained reference sector mapping resolves them.
+positions may show `Unknown` in fund holdings and change-analysis responses. The planner also
+tries its company-name and matching-security sector fallbacks before marking them Unclassified.
 
 Some products hold derivatives, debt, collateral, or other assets. N-PORT rows outside supported
 long equity and cash are kept as `other` so their value remains visible. The current price/activity

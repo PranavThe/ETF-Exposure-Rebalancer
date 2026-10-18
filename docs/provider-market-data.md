@@ -47,10 +47,12 @@ the legacy `provider_holdings.ticker` column from `VARCHAR(32)` to `TEXT` before
 
 ## Read endpoints
 
-- `POST /provider-data/funds/{ticker}/sync` checks Neon first and fetches the TickerInside file
+- `POST /provider-data/funds/{ticker}/sync` checks the configured database first and fetches the TickerInside file
   only when the fund has no saved TickerInside snapshot. A provider miss or temporary error is
   returned as a status so the app can keep using any SEC or issuer snapshot. The planner calls this
   for newly added funds and recalculates after the request completes.
+- The planner uses a stored TickerInside snapshot only when it is strictly newer than the latest
+  issuer/SEC snapshot or when no issuer/SEC snapshot exists. Equal dates select issuer/SEC data.
 - `GET /provider-data/funds/{ticker}/holdings` returns the latest stored TickerInside weights,
   its source/as-of metadata and attribution line, plus entries, exits, and changed weights relative
   to the previous source date. An exit means the ticker is no longer reported, not proof of a sale.

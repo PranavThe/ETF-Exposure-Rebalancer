@@ -35,7 +35,7 @@ def fetch_etf_directory(timeout: int = 30) -> dict[str, str]:
     """Fetch Nasdaq-listed and other U.S.-exchange-listed ETFs; no API key required."""
     combined = {}
     for url, other_listed in ((NASDAQ_LISTED, False), (OTHER_LISTED, True)):
-        request = Request(url, headers={"User-Agent": "FundShift/0.1"})
+        request = Request(url, headers={"User-Agent": "Glean/0.1"})
         with urlopen(request, timeout=timeout) as response:
             content = response.read().decode("utf-8-sig")
         combined.update(etfs_from_directory(content, other_listed=other_listed))

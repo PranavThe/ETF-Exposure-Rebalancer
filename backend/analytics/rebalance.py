@@ -63,7 +63,7 @@ SMOOTHING = 1e-7
 MAX_ITERATIONS = 500
 SHORTLIST_SIZE = 12  # candidate new ETFs considered per plan
 MIN_POSITION = 0.01  # positions below 1% of the portfolio are dropped rather than suggested
-MIN_GAIN = 0.005  # a plan, and each new ETF in it, must come at least 0.5 pp closer to the target
+MIN_GAIN = 0.005  # each new ETF must bring the plan at least 0.5 pp closer to the target
 
 # The only ETFs a plan may propose adding: plain, liquid, non-leveraged index ETFs a beginner would
 # recognise (broad U.S. market, size and style, dividend, international, the sector families from
@@ -488,8 +488,8 @@ def build_plans(
             continue  # nothing to do with these ETFs
         after = exposure(allocation, weights)
         after_distance = distance(after, target)
-        if held and after_distance > before_distance - MIN_GAIN:
-            continue  # the solver's least-squares step can leave the match no better, or worse
+        if held and after_distance >= before_distance - 1e-9:
+            continue  # show only plans that get closer; small improvements still count
         new_funds = sorted(t for t in allocation if t not in held and allocation[t] > 0)
         moved = math.fsum(m.amount for m in moves if m.action in ("reduce", "remove"))
         summary = _summary(kind, moves, moved, before_distance, after_distance, held)

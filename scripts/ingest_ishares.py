@@ -48,7 +48,7 @@ def official_url(url: str) -> bool:
 def fetch(url: str) -> tuple[str, bytes]:
     if not official_url(url):
         raise ValueError("--url must be an HTTPS iShares URL")
-    request = Request(url, headers={"User-Agent": "FundShift/0.1"})
+    request = Request(url, headers={"User-Agent": "Glean/0.1"})
     with urlopen(request, timeout=30) as response:
         body = response.read()
         final_url = response.geturl()
@@ -63,7 +63,7 @@ def fetch(url: str) -> tuple[str, bytes]:
     csv_url = urljoin(final_url, links.href)
     if not official_url(csv_url):
         raise ValueError("holdings CSV link is outside ishares.com")
-    request = Request(csv_url, headers={"User-Agent": "FundShift/0.1"})
+    request = Request(csv_url, headers={"User-Agent": "Glean/0.1"})
     with urlopen(request, timeout=30) as response:
         csv_body = response.read()
         resolved_url = response.geturl()

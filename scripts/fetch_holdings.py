@@ -20,7 +20,7 @@ from backend.pipeline.adapters.base import ValidationError  # noqa: E402
 
 RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
 # The issuer's site rejects the default Python user agent.
-USER_AGENT = "Mozilla/5.0 (compatible; FundShift holdings fetcher)"
+USER_AGENT = "Mozilla/5.0 (compatible; Glean holdings fetcher)"
 
 
 def main(argv: list[str] | None = None) -> int:

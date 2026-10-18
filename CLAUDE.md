@@ -1,4 +1,4 @@
-# FundShift — notes for Claude Code
+# Glean — working conventions
 
 The product is a one-screen sector-exposure tool (`/app`): the user's ETFs, their look-through
 sector mix vs the mix they want, and suggested moves. SPEC.md still governs the holdings pipeline
@@ -35,6 +35,12 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   the sector the same security id has in an allowlisted fund. Rebuild the CSV with
   `scripts/build_name_sectors.py` from the gitignored `data/vendor/ishares/*.csv`. The name fallback
   is planner-only: `/funds/...` and the change analysis still use `resolve_sector` alone.
+- The planner selects a TickerInside snapshot only when it is newer than the latest issuer/SEC
+  snapshot or no issuer/SEC snapshot exists. The app attempts a bounded TickerInside lookup when
+  adding a fund with no provider snapshot. Stored Alpaca IEX prices come from the scheduled or
+  manual sync, not from a browser request.
+- There are two plan types. Unchanged or duplicate results are omitted; any improvement to a
+  rearrangement can be shown, while each newly added ETF must improve distance by at least 0.5 pp.
 - `load_universe` (`routes/plans.py`) reads only the held funds and the allowlist, caching mixes per
   snapshot; `/etfs/covered` lists the allowlisted funds with holdings (plus local Synthetic samples).
 - Routes: `POST /plan`, `GET /etfs/covered`, `GET/PUT /portfolios/{id}/preferences` (`routes/plans.py`);
@@ -69,7 +75,7 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
 - Weight differences are "pp", never "%". In the change analysis every drift shows its price/activity split.
 - Template: `Health Care exposure +5.0 pp (price −2.8 pp, portfolio activity +7.8 pp)`
 - These rules cover caveat strings too (they appear in the UI).
-- Footer on every page: "Derived from issuer-published holdings snapshots. Not investment advice."
+- Footer on every page: "Based on dated ETF holdings. Not investment advice."
 
 ## ARKK source file (observed 2026-10-17, saved as data/raw/ARKK_2026-10-16.csv)
 - URL: https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv

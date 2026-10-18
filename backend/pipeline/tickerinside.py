@@ -26,7 +26,7 @@ class ProviderNotCovered(ProviderError):
 def fetch_fund(ticker: str, *, timeout: int = 30) -> dict:
     ticker = ticker.strip().upper()
     url = f"{API_ROOT}/fund/{ticker.lower()}.json"
-    request = Request(url, headers={"User-Agent": "FundShift/1.0"})
+    request = Request(url, headers={"User-Agent": "Glean/1.0"})
     try:
         with urlopen(request, timeout=timeout) as response:
             payload = json.load(response)
