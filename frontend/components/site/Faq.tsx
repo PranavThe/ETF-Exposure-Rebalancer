@@ -60,7 +60,7 @@ const ITEMS = [
     ),
   },
   {
-    title: "Does it account for taxes, fees or trading costs?",
+    title: "Does it account for taxes, fees or transaction costs?",
     body: (
       <p>
         No. Reducing an ETF can mean a tax bill, and moving money can come with costs. {BRAND} leaves all of that out,

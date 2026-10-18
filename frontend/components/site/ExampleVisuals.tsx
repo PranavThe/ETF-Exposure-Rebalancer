@@ -288,9 +288,9 @@ const OTHER_PLAN = { title: "Rearrange the ETFs you own", distanceAfter: 0.0428,
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="px-4 py-3 sm:px-5">
+    <div className="flex items-baseline justify-between gap-4 px-4 py-2.5 sm:block sm:px-5 sm:py-3">
       <div className="label">{label}</div>
-      <div className="mt-1.5 font-mono text-[13px] text-fg tabular-nums sm:text-[14px]">{children}</div>
+      <div className="font-mono text-[13px] whitespace-nowrap text-fg tabular-nums sm:mt-1.5 sm:text-[14px]">{children}</div>
     </div>
   );
 }
@@ -346,7 +346,7 @@ export function PlanMock() {
         </ul>
       </div>
 
-      <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
+      <div className="grid grid-cols-1 divide-y divide-line border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <Stat label="Distance">
           {(PLAN.distanceBefore * 100).toFixed(1)} → {ppLevel(PLAN.distanceAfter)}
         </Stat>

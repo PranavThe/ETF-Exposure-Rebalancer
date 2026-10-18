@@ -118,8 +118,8 @@ export default function LandingPage() {
         title="The moves to get there"
         intro={
           <p>
-            {BRAND} works out how to reach your target: reduce or increase the ETFs you hold, or add up to two new ones.
-            Each plan shows how close it gets and how much money moves.
+            {BRAND} works out how to reach your target: reduce or increase the ETFs you hold, or add new ones, up to a
+            limit you set. Each plan shows how close it gets and how much money moves.
           </p>
         }
         subTitle="Options, not instructions"

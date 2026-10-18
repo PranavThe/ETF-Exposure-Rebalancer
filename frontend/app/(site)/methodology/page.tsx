@@ -29,11 +29,11 @@ const SECTIONS: TocEntry[] = [
 const n = (id: string) => SECTIONS.findIndex((s) => s.id === id) + 1;
 const t = (id: string) => SECTIONS.find((s) => s.id === id)?.title ?? id;
 
-// Mirrors backend/analytics/rebalance.py.
-const PLANNER_CONFIG = `MAX_NEW_ETFS   = 2        # new ETFs per plan
-SHORTLIST_SIZE = 12       # candidate new ETFs considered per plan
+// Mirrors backend/analytics/rebalance.py (max_new_funds is build_plans' default; the app lets you change it).
+const PLANNER_CONFIG = `SHORTLIST_SIZE = 12       # candidate new ETFs considered per plan
 MIN_POSITION   = 0.01     # 1% of the portfolio
-MIN_GAIN       = 0.005    # 0.5 pp closer to the target`;
+MIN_GAIN       = 0.005    # 0.5 pp closer to the target
+max_new_funds  = 2        # default limit on new ETFs per plan`;
 
 export default function MethodologyPage() {
   return (
@@ -54,7 +54,7 @@ export default function MethodologyPage() {
             words first and formulas after.
           </p>
           <ul className="mt-10 flex flex-wrap gap-2 font-mono text-[11px] tracking-[0.04em] text-muted uppercase">
-            {["Latest holdings per ETF", "Dollar-weighted", "Weights in %, differences in pp", "Up to 2 new ETFs"].map(
+            {["Latest holdings per ETF", "Dollar-weighted", "Weights in %, differences in pp", "Whole-dollar moves"].map(
               (x) => (
                 <li key={x} className="border border-line px-2.5 py-1.5">
                   {x}
@@ -209,20 +209,20 @@ export default function MethodologyPage() {
                 head={["Situation", "Plan", "Allowed moves"]}
                 rows={[
                   ["No money in or out", "Rearrange the ETFs you own", "Increase and reduce the ETFs you hold"],
-                  ["", "Rearrange and add new ETFs", "The same, plus add up to 2 new ETFs"],
+                  ["", "Rearrange and add new ETFs", "The same, plus add new ETFs"],
                   [
                     "Adding money",
                     "Invest without reducing anything",
-                    "Increase ETFs you hold or add up to 2 new ones; every ETF you hold stays at least where it is",
+                    "Increase ETFs you hold or add new ones; every ETF you hold stays at least where it is",
                   ],
-                  ["", "Invest and rearrange", "Any of the moves, with up to 2 new ETFs"],
+                  ["", "Invest and rearrange", "Any of the moves, including new ETFs"],
                   ["Taking money out", "Take out only by reducing", "Reduce ETFs you hold; nothing is increased or added"],
-                  ["", "Take out and rearrange", "Any of the moves, with up to 2 new ETFs"],
+                  ["", "Take out and rearrange", "Any of the moves, including new ETFs"],
                 ]}
               />
               <p>
-                If you hold nothing yet and add money, there is one plan, which picks up to 2 ETFs. Each plan is built
-                in the same steps:
+                You choose how many new ETFs a plan may add; the default is 2. If you hold nothing yet and add money,
+                there is one plan, which picks ETFs up to that limit. Each plan is built in the same steps:
               </p>
               <Bullets>
                 <li>
@@ -237,7 +237,7 @@ export default function MethodologyPage() {
                 </li>
                 <li>
                   <Term>New ETFs, one at a time.</Term> The candidate that helps most is added first, then the next. Each
-                  joins only if it brings the plan at least 0.5 pp closer to your target, and a plan adds at most 2.
+                  joins only if it brings the plan at least 0.5 pp closer to your target, and no plan goes over your limit.
                 </li>
                 <li>
                   <Term>No slivers.</Term> A new ETF that would end up under 1% of the portfolio is dropped and the plan
@@ -329,13 +329,14 @@ export default function MethodologyPage() {
 
             <DocSection id="saving" index={n("saving")} title={t("saving")}>
               <p>
-                There are no accounts. When you save, your ETFs, amounts and target are stored under a random link, and
-                you get a private <Term>edit key</Term> that stays in this browser. The server keeps only a fingerprint
-                of the key, never the key itself.
+                There are no accounts. Your ETFs, amounts and target save automatically under a random link, and this
+                browser keeps a private <Term>edit key</Term> for it. The server stores only a fingerprint of the key,
+                never the key itself.
               </p>
               <Bullets>
                 <li>Anyone with the link can see the saved portfolio.</li>
                 <li>Only a browser holding the edit key can change or delete it.</li>
+                <li>Opening someone else&apos;s link and making changes saves them as your own copy.</li>
                 <li>If you clear this browser&apos;s site data, the key goes with it and the portfolio can no longer be changed.</li>
               </Bullets>
             </DocSection>
@@ -343,7 +344,7 @@ export default function MethodologyPage() {
             <DocSection id="limitations" index={n("limitations")} title={t("limitations")}>
               <Bullets>
                 <li>
-                  Taxes, fees, trading costs and bid-ask spreads are not considered. Reducing an ETF can have tax
+                  Taxes, fees, transaction costs and bid-ask spreads are not considered. Reducing an ETF can have tax
                   consequences.
                 </li>
                 <li>
