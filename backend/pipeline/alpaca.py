@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from backend.app.models import SecurityPrice
 
 API_ROOT = "https://data.alpaca.markets/v2/stocks/bars"
+ASSETS_API_ROOT = "https://paper-api.alpaca.markets/v2/assets"
 MAX_SYMBOLS_PER_REQUEST = 100
 FEED = "iex"
 ADJUSTMENT = "all"
@@ -31,6 +32,44 @@ def priceable_stock_symbols(symbols: set[str]) -> set[str]:
     normalized = {symbol.strip().upper() for symbol in symbols if symbol.strip()}
     return {symbol for symbol in normalized
             if _STOCK_SYMBOL.fullmatch(symbol) and any(char.isalpha() for char in symbol)}
+
+
+def fetch_supported_stock_symbols(symbols: set[str]) -> set[str]:
+    """Return candidate symbols present in Alpaca's active U.S. equity universe.
+
+    Holdings providers can report international listings (for example ``1.HK``).
+    Alpaca rejects an entire multi-symbol bars request if it contains one unsupported
+    symbol, so validate candidates against Alpaca before batching price requests.
+    """
+    candidates = priceable_stock_symbols(symbols)
+    if not candidates:
+        return set()
+    api_key = os.environ.get("ALPACA_API_KEY_ID")
+    api_secret = os.environ.get("ALPACA_API_SECRET_KEY")
+    if not api_key or not api_secret:
+        raise AlpacaError("Set ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY in the backend environment")
+    request = Request(
+        f"{ASSETS_API_ROOT}?{urlencode({'status': 'active', 'asset_class': 'us_equity'})}",
+        headers={
+            "APCA-API-KEY-ID": api_key,
+            "APCA-API-SECRET-KEY": api_secret,
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(request, timeout=45) as response:
+            payload = json.load(response)
+    except HTTPError as exc:
+        message = exc.read().decode("utf-8", "replace")[:400]
+        raise AlpacaError(f"Alpaca asset lookup returned HTTP {exc.code}: {message}") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise AlpacaError(f"Could not fetch Alpaca asset list: {exc}") from exc
+    if not isinstance(payload, list):
+        raise AlpacaError("Alpaca asset lookup returned an unexpected response")
+    supported = {asset.get("symbol", "").upper() for asset in payload
+                 if isinstance(asset, dict) and asset.get("status") == "active"
+                 and asset.get("class") == "us_equity"}
+    return candidates & supported
 
 
 def _get_bars(symbols: list[str], *, start: date, end: date, api_key: str,
