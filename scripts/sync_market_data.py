@@ -24,7 +24,7 @@ from backend.app.db import (get_engine, init_db,
 from backend.app.models import (Fund, Holding, Portfolio, PortfolioFund, ProviderHolding,
                                 ProviderHoldingsSnapshot, Snapshot)  # noqa: E402
 from backend.pipeline.alpaca import (AlpacaError, fetch_daily_bars,
-                                     priceable_stock_symbols,
+                                     fetch_supported_stock_symbols,
                                      save_daily_bars)  # noqa: E402
 from backend.pipeline.tickerinside import (ProviderError, ProviderNotCovered, fetch_fund,
                                            save_fund)  # noqa: E402
@@ -143,12 +143,16 @@ def main(argv: list[str] | None = None) -> int:
         print("No stored TickerInside holdings available to price", file=sys.stderr)
         return 1
 
-    price_symbols = priceable_stock_symbols(symbols)
+    try:
+        price_symbols = fetch_supported_stock_symbols(symbols)
+    except AlpacaError as exc:
+        print(f"Alpaca symbol validation failed: {exc}", file=sys.stderr)
+        return 1
     skipped_symbols = symbols - price_symbols
     if skipped_symbols:
-        print(f"Skipping {len(skipped_symbols)} non-stock holding identifiers in Alpaca request")
+        print(f"Skipping {len(skipped_symbols)} symbols outside Alpaca's active U.S. equity universe")
     if not price_symbols:
-        print("No priceable U.S. stock symbols available", file=sys.stderr)
+        print("No Alpaca-supported U.S. stock symbols available", file=sys.stderr)
         return 1
 
     try:
