@@ -29,7 +29,9 @@ Actions secrets. The sync writes only provider holdings and price tables, not SE
 Optional price-bar dates are `--start YYYY-MM-DD` (inclusive, defaults to 14 calendar days before
 today) and `--end YYYY-MM-DD` (inclusive, defaults to today). Run after the regular market close
 to avoid storing a partial current-day bar. The lookback captures the most recent trading day when
-a run occurs on weekends or holidays. No provider calls are made from user-facing API requests.
+a run occurs on weekends or holidays. The app makes a bounded TickerInside request when a newly
+added fund has no TickerInside snapshot in the database. It does not fetch price bars during user
+requests; Alpaca prices continue to come from the scheduled or manually started sync.
 
 The command fetches the selected funds' current TickerInside files, stores each distinct source
 snapshot in `provider_holdings_snapshots` and its ticker/weight rows in `provider_holdings`, then
@@ -45,6 +47,10 @@ the legacy `provider_holdings.ticker` column from `VARCHAR(32)` to `TEXT` before
 
 ## Read endpoints
 
+- `POST /provider-data/funds/{ticker}/sync` checks Neon first and fetches the TickerInside file
+  only when the fund has no saved TickerInside snapshot. A provider miss or temporary error is
+  returned as a status so the app can keep using any SEC or issuer snapshot. The planner calls this
+  for newly added funds and recalculates after the request completes.
 - `GET /provider-data/funds/{ticker}/holdings` returns the latest stored TickerInside weights,
   its source/as-of metadata and attribution line, plus entries, exits, and changed weights relative
   to the previous source date. An exit means the ticker is no longer reported, not proof of a sale.

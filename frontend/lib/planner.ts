@@ -183,6 +183,7 @@ export const planner = {
 // ---- Saving: an anonymous portfolio (weights) plus its dollar value and target ---------------
 
 type Saved = { id: string; key: string | null };
+export type PortfolioSaveResult = { place: Saved; addedFunds: boolean };
 const KEYS = "planner:edit-keys";
 const LAST = "planner:last";
 
@@ -238,7 +239,7 @@ export async function loadPortfolio(id: string): Promise<{ holdings: Holding[]; 
 }
 
 /** Create or update the saved portfolio; returns where it now lives. */
-export async function savePortfolio(saved: Saved | null, holdings: Holding[], target: Mix | null): Promise<Saved> {
+export async function savePortfolio(saved: Saved | null, holdings: Holding[], target: Mix | null): Promise<PortfolioSaveResult> {
   const kept = holdings.filter((h) => h.amount > 0);
   const total = kept.reduce((a, h) => a + h.amount, 0);
   const weights = kept.map((h) => h.amount / total);
@@ -246,17 +247,32 @@ export async function savePortfolio(saved: Saved | null, holdings: Holding[], ta
   if (weights.length) weights[weights.length - 1] = 1 - weights.slice(0, -1).reduce((a, w) => a + w, 0);
   const body = JSON.stringify({ name: "My ETFs", funds: kept.map((h, i) => ({ ticker: h.ticker, weight: weights[i] })) });
   let place = saved;
+  let previousTickers = new Set<string>();
   if (place?.key) {
+    const existing = await call<{ funds: { ticker: string }[] }>(`/portfolios/${encodeURIComponent(place.id)}`);
+    previousTickers = new Set(existing.funds.map((fund) => fund.ticker.toUpperCase()));
     await call(`/portfolios/${encodeURIComponent(place.id)}`, { method: "PUT", body, editKey: place.key });
   } else {
     const created = await call<{ id: string; edit_key: string }>("/portfolios", { method: "POST", body });
     place = { id: created.id, key: created.edit_key };
     remember(place.id, created.edit_key);
   }
+
+  const addedTickers = [...new Set(kept.map((fund) => fund.ticker.toUpperCase()))]
+    .filter((ticker) => !previousTickers.has(ticker));
+  // Fetch newly added funds after the portfolio write, so data-provider errors never block saving.
+  // Keep the number of simultaneous provider requests bounded for larger portfolios.
+  for (let index = 0; index < addedTickers.length; index += 4) {
+    await Promise.all(addedTickers.slice(index, index + 4).map((ticker) =>
+      call(`/provider-data/funds/${encodeURIComponent(ticker)}/sync`, { method: "POST" })
+        .catch(() => null),
+    ));
+  }
+
   await call(`/portfolios/${encodeURIComponent(place.id)}/preferences`, {
     method: "PUT",
     body: JSON.stringify({ total_value: total, target }),
     editKey: place.key ?? undefined,
   });
-  return place;
+  return { place, addedFunds: addedTickers.length > 0 };
 }
