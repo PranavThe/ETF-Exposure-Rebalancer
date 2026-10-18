@@ -19,10 +19,13 @@ sys.path.insert(0, str(ROOT))
 from sqlalchemy import func, inspect, select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from backend.app.db import get_engine, init_db  # noqa: E402
+from backend.app.db import (get_engine, init_db,
+                            migrate_provider_holding_ticker)  # noqa: E402
 from backend.app.models import (Fund, Holding, Portfolio, PortfolioFund, ProviderHolding,
                                 ProviderHoldingsSnapshot, Snapshot)  # noqa: E402
-from backend.pipeline.alpaca import AlpacaError, fetch_daily_bars, save_daily_bars  # noqa: E402
+from backend.pipeline.alpaca import (AlpacaError, fetch_daily_bars,
+                                     priceable_stock_symbols,
+                                     save_daily_bars)  # noqa: E402
 from backend.pipeline.tickerinside import (ProviderError, ProviderNotCovered, fetch_fund,
                                            save_fund)  # noqa: E402
 
@@ -52,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.portfolio_funds:
         if not args.plan_only:
             init_db()
+            migrate_provider_holding_ticker()
         with Session(get_engine()) as session:
             tickers = sorted(session.scalars(
                 select(Fund.ticker).join(PortfolioFund, PortfolioFund.fund_id == Fund.id)
@@ -67,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.plan_only:
         init_db()  # creates the additive provider tables; leaves existing SEC tables intact
+        migrate_provider_holding_ticker()
     failures = 0
     fetched = {}
     for ticker in tickers:
@@ -138,17 +143,25 @@ def main(argv: list[str] | None = None) -> int:
         print("No stored TickerInside holdings available to price", file=sys.stderr)
         return 1
 
+    price_symbols = priceable_stock_symbols(symbols)
+    skipped_symbols = symbols - price_symbols
+    if skipped_symbols:
+        print(f"Skipping {len(skipped_symbols)} non-stock holding identifiers in Alpaca request")
+    if not price_symbols:
+        print("No priceable U.S. stock symbols available", file=sys.stderr)
+        return 1
+
     try:
-        bars = fetch_daily_bars(symbols, start=start, end=end)
+        bars = fetch_daily_bars(price_symbols, start=start, end=end)
     except AlpacaError as exc:
         print(f"Alpaca price refresh failed: {exc}", file=sys.stderr)
         return 1
     with Session(get_engine()) as session, session.begin():
         upserted = save_daily_bars(session, bars)
     returned_symbols = {bar["ticker"] for bar in bars}
-    missing = sorted(symbols - returned_symbols)
+    missing = sorted(price_symbols - returned_symbols)
     print(f"Alpaca IEX: received {len(bars)} daily bars for {len(returned_symbols)} of "
-          f"{len(symbols)} requested symbols; upserted {upserted} bars")
+          f"{len(price_symbols)} requested symbols; upserted {upserted} bars")
     if missing:
         print("no IEX daily bar in requested window: " + ", ".join(missing[:40])
               + (" …" if len(missing) > 40 else ""), file=sys.stderr)

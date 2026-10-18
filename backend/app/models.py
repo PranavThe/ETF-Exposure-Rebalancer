@@ -85,7 +85,9 @@ class ProviderHolding(Base):
     snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("provider_holdings_snapshots.id", ondelete="CASCADE"), index=True
     )
-    ticker: Mapped[str] = mapped_column(String(32))
+    # TickerInside may use a full fixed-income/security description when the
+    # holding has no equity ticker (for example, a CLO tranche).
+    ticker: Mapped[str] = mapped_column(Text)
     weight: Mapped[float] = mapped_column(Double)
 
 
