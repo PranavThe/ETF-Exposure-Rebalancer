@@ -98,8 +98,7 @@ export default function DiscoverBoard() {
   } else if (all.length === 0) {
     body = (
       <Notice>
-        No funds stored yet. Ingest issuer holdings files with <code className="font-mono text-fg">make demo</code>, then
-        reload.
+        No fund snapshots are loaded yet. Add holdings data to the backend, then reload.
       </Notice>
     );
   } else {

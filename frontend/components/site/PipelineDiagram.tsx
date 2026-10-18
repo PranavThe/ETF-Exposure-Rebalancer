@@ -5,8 +5,8 @@ import { BRAND } from "@/lib/brand";
 // analysis time, so it does not pass through the per-file stages.
 
 const SOURCES = [
-  { x: 72, label: "ARK INVEST CSV", note: "daily · weights in %", color: "#a6a1ff" },
-  { x: 220, label: "SAMPLE FIXTURES", note: "DEMO · SPLT · FLOW", color: "#34c79f" },
+  { x: 72, label: "ISSUER FILES", note: "fund-published holdings", color: "#a6a1ff" },
+  { x: 220, label: "SEC N-PORT", note: "regulatory filings", color: "#34c79f" },
   { x: 368, label: "REFERENCE DATA", note: "sectors · funds", color: "#5aa9e6" },
 ];
 
@@ -55,8 +55,8 @@ export default function PipelineDiagram() {
       >
         <title id="site-pipe-title">{`${BRAND} ingest pipeline`}</title>
         <desc id="site-pipe-desc">
-          ARK Invest CSV files and sample fixtures pass through four stages, adapter, validate, normalize and load, into
-          the {BRAND} API. Reference data for sectors and funds joins at the API.
+          Issuer holdings files and SEC N-PORT filings pass through four stages, adapter, validate, normalize and load,
+          into the {BRAND} API. Reference data for sectors and funds joins at the API.
         </desc>
         <defs>
           {SOURCES.map((s, i) => (

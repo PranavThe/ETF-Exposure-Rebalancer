@@ -49,7 +49,7 @@ export default function AnnouncementBar() {
     <div role="region" aria-label="Announcement" className="relative flex min-h-10 items-center justify-center bg-panel px-10 py-2 text-center text-[12px] text-fg/85 sm:px-12 sm:text-[13px]">
       <p>
         <span className="mr-2 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-up align-middle" aria-hidden />
-        Now tracking ARKK daily holdings from ARK Invest
+        Holdings snapshots include their source and reporting date
       </p>
       <button
         type="button"

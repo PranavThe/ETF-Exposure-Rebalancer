@@ -12,7 +12,7 @@ from backend.pipeline.nport import read_series_classes
 def test_loaded_funds_filter_and_limit(client):
     response = client.get("/funds", params={"loaded_only": "true", "limit": 2})
     assert response.status_code == 200
-    assert [fund["ticker"] for fund in response.json()] == ["DEMO", "FLOW"]
+    assert [fund["ticker"] for fund in response.json()] == ["DEMO", "FLOWTEST"]
     assert client.get("/funds", params={"limit": 0}).status_code == 422
     assert client.get("/funds/DEMO").json()["snapshot_count"] == 3
     assert client.get("/funds/NOPE").status_code == 404

@@ -195,7 +195,7 @@ function SnapshotsTable({ fund, snapshots }: { fund: string; snapshots: Snapshot
                     {s.source_url}
                   </a>
                 ) : (
-                  <span className="text-muted">Synthetic sample file</span>
+                  <span className="text-muted">Source URL unavailable</span>
                 )}
                 <div className="truncate font-mono text-[11px] text-faint" title={s.source_file}>
                   {s.source_file}

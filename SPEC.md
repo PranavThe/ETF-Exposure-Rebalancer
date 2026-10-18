@@ -286,7 +286,7 @@ Notes:
 |---|---|---|
 | DEMO | Demo Active Fund | Synthetic |
 | SPLT | Split Test Fund | Synthetic |
-| FLOW | Flow Test Fund | Synthetic |
+| FLOWTEST | Flow Test Fund | Synthetic |
 | ARKK | ARK Innovation ETF | ARK Invest |
 
 `data/reference/sectors.csv`:
@@ -382,7 +382,7 @@ Expected (default top_n = 10):
 - every activity_effect is 0
 - events: exactly one, SUSPECTED_CORPORATE_ACTION for FFF with magnitude 2
 
-### Fixture FLOW
+### Fixture FLOWTEST
 
 Inputs:
 
@@ -526,7 +526,7 @@ requirements.txt
 3. Click an event: its contributing holdings are highlighted, and the source snapshot data and content hashes are one click away.
 4. Re-run the ingest: it prints `already ingested`, and the event IDs are identical.
 5. Open SPLT: FFF's share count doubled, but it is flagged as a suspected split, not reported as an increased position.
-6. Open FLOW: every share count rose 10%, and there are no events, because that was fund flow.
+6. Open FLOWTEST: every share count rose 10%, and there are no events, because that was fund flow.
 7. If real ARKK snapshots exist, switch to ARKK.
 
 ## 14. Known limitations (copy into README)

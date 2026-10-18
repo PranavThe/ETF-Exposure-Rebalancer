@@ -1,10 +1,9 @@
 import Link from "next/link";
 
 import { Crosshair } from "./Frame";
-import HeroVisual from "./HeroVisual";
 import { LAUNCH_APP, METHODOLOGY } from "./links";
 
-const DATA_SOURCES = ["ARK Invest", "Synthetic test funds", "Issuer CSV files"];
+const DATA_SOURCES = ["Issuer holdings files", "SEC N-PORT filings"];
 
 /** White rectangular call to action with crosshair marks at its corners. */
 export function LaunchButton() {
@@ -33,7 +32,7 @@ export default function Hero() {
       aria-labelledby="hero-heading"
       className="relative flex min-h-[max(620px,calc(100svh-105px))] flex-col overflow-hidden bg-[#050506]"
     >
-      <HeroVisual />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_70%_25%,rgba(122,115,240,0.14),transparent_48%),radial-gradient(ellipse_at_15%_80%,rgba(201,133,0,0.08),transparent_40%)]" />
       <div className="relative flex flex-1 flex-col justify-end px-5 pt-40 pb-12 sm:px-8 sm:pb-14 lg:px-14">
         <h1
           id="hero-heading"
@@ -59,7 +58,7 @@ export default function Hero() {
       <div className="relative mx-5 border-t border-line text-faint sm:mx-8 lg:mx-14">
         <Crosshair className="left-1/2 -top-[5px] -translate-x-1/2" />
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3 py-6 sm:gap-x-10">
-          <span className="label">Data from</span>
+          <span className="label">Sources supported</span>
           {DATA_SOURCES.map((s) => (
             <span key={s} className="text-[14px] font-semibold tracking-[0.02em] text-fg/55 uppercase sm:text-[15px]">
               {s}
