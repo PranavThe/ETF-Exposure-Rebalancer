@@ -1,0 +1,33 @@
+Glean: Devpost media
+====================
+
+Demo video: glean-demo.mp4 (2:04, 1920x1080). Upload it to YouTube (public or unlisted) and paste the link into Devpost's video field.
+
+Image gallery (3:2, each under 5 MB). Suggested order and captions:
+
+00-cover.png
+  Glean: see what your ETFs really hold.
+
+01-landing.png
+  The landing page: see what you really own, choose the mix you want.
+
+02-overview.png
+  One screen: your ETFs, your look-through sector mix against your target, Scythe (Gemini), and the exact moves to get there.
+
+03-companies.png
+  Hidden overlap: the same companies counted once across your ETFs, with the top-10 share and how much each pair of funds overlaps.
+
+04-whats-inside.png
+  Each fund's yearly fee, linked to its SEC filing, and a Gemini-written plain-language summary of what it holds.
+
+05-why-these-moves.png
+  "Why these moves?": Gemini explains the plan from numbers Glean computes, and lists what to weigh before acting.
+
+06-before-you-act.png
+  "Before you act": taxes, costs, data dates, sectors vs companies, and the AI's role, always one click away.
+
+07-methodology.png
+  Every formula, threshold and data source is documented on the methodology page.
+
+08-phone.png
+  Works on phones too: holdings, the sector mix with target handles, and the suggested moves.
