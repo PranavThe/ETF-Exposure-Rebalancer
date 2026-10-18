@@ -75,7 +75,7 @@ export default function LandingPage() {
         intro={
           <p>
             Set the mix you want with a slider for each sector, or just say it: &ldquo;less tech, more health
-            care&rdquo;, &ldquo;no energy&rdquo;, &ldquo;I&apos;m adding $2,000&rdquo;. The assistant turns your words
+            care&rdquo;, &ldquo;no energy&rdquo;, &ldquo;30% financials&rdquo;. Scythe, the assistant, turns your words
             into numbers you can see and change. It never decides what you should want.
           </p>
         }
@@ -84,7 +84,7 @@ export default function LandingPage() {
             title: "Sliders always work",
             body: (
               <p>
-                Every sector has its own slider, and they work on their own. The assistant is a shortcut, never a
+                Every sector has its own slider, and they work on their own. Scythe is a shortcut, never a
                 requirement.
               </p>
             ),
@@ -93,8 +93,8 @@ export default function LandingPage() {
             title: "Plain words, exact numbers",
             body: (
               <p>
-                The assistant, Claude, changes only what you mention, keeps the total at 100%, and tells you what moved
-                in % and pp. Mention money you&apos;re adding or taking out and the plans use that amount.
+                Scythe runs on Claude. It changes only what you mention, keeps the total at 100%, and tells you what
+                moved in % and pp.
               </p>
             ),
           },
@@ -131,11 +131,11 @@ export default function LandingPage() {
         }
         items={[
           {
-            title: "A plan for each situation",
+            title: "Two kinds of plan",
             body: (
               <p>
-                Rearrange only what you own, rearrange and add new ETFs, invest new money without reducing anything, or
-                take money out only by reducing.
+                Rearrange only what you own, or rearrange and add a few plain, well-known ETFs. Both use the money
+                already in your ETFs.
               </p>
             ),
           },

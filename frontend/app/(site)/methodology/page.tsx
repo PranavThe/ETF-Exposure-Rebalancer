@@ -20,7 +20,7 @@ const SECTIONS: TocEntry[] = [
   { id: "portfolio-mix", title: "Your portfolio's mix" },
   { id: "distance", title: "Distance to your target" },
   { id: "plans", title: "How plans are found" },
-  { id: "assistant", title: "The assistant" },
+  { id: "assistant", title: "Scythe, the assistant" },
   { id: "sources", title: "Data sources and freshness" },
   { id: "saving", title: "Saving without an account" },
   { id: "limitations", title: "Limitations" },
@@ -103,7 +103,7 @@ export default function MethodologyPage() {
                   <Term>sector mix</Term> is those ETF mixes blended by your dollars.
                 </li>
                 <li>
-                  You set a <Term>target mix</Term> with sliders, or in plain words that the assistant turns into
+                  You set a <Term>target mix</Term> with sliders, or in plain words that Scythe, the assistant, turns into
                   numbers. The target is always yours: {BRAND} never suggests one.
                 </li>
                 <li>
@@ -202,27 +202,19 @@ export default function MethodologyPage() {
 
             <DocSection id="plans" index={n("plans")} title={t("plans")}>
               <p>
-                A plan is a new dollar amount for each ETF. Which moves a plan may use depends on whether you are adding
-                money, taking money out, or neither; each situation gets two plans.
+                A plan is a new dollar amount for each ETF, using the money already in your ETFs: the total stays the
+                same. There are two plans.
               </p>
               <DocTable
-                head={["Situation", "Plan", "Allowed moves"]}
+                head={["Plan", "Allowed moves"]}
                 rows={[
-                  ["No money in or out", "Rearrange the ETFs you own", "Increase and reduce the ETFs you hold"],
-                  ["", "Rearrange and add new ETFs", "The same, plus add new ETFs"],
-                  [
-                    "Adding money",
-                    "Invest without reducing anything",
-                    "Increase ETFs you hold or add new ones; every ETF you hold stays at least where it is",
-                  ],
-                  ["", "Invest and rearrange", "Any of the moves, including new ETFs"],
-                  ["Taking money out", "Take out only by reducing", "Reduce ETFs you hold; nothing is increased or added"],
-                  ["", "Take out and rearrange", "Any of the moves, including new ETFs"],
+                  ["Rearrange what you own", "Increase and reduce the ETFs you hold"],
+                  ["Add new ETFs", "The same, plus add new ETFs"],
                 ]}
               />
               <p>
-                You choose how many new ETFs a plan may add; the default is 2. If you hold nothing yet and add money,
-                there is one plan, which picks ETFs up to that limit. Each plan is built in the same steps:
+                You choose how many new ETFs a plan may add; the default is 2. To plan with more or less money, change
+                the dollar amounts in your holdings. Each plan is built in the same steps:
               </p>
               <Bullets>
                 <li>
@@ -266,9 +258,9 @@ export default function MethodologyPage() {
 
             <DocSection id="assistant" index={n("assistant")} title={t("assistant")}>
               <p>
-                The assistant is Claude, a model made by Anthropic. Its only job is to turn what you type into a
-                target mix and, when you mention one, an amount of money you&apos;re adding or taking out. The plans
-                themselves always come from the math above, never from the model.
+                Scythe is the assistant. It runs on Claude, a model made by Anthropic, and its only job is to turn what
+                you type into a target mix. The plans themselves always come from the math above, never from the
+                model, and they always use the money already in your ETFs.
               </p>
               <Bullets>
                 <li>
@@ -292,7 +284,7 @@ export default function MethodologyPage() {
                 </li>
               </Bullets>
               <p>
-                The sliders work without the assistant. If Claude isn&apos;t available, a simple built-in reader still
+                The sliders work without Scythe. If Claude isn&apos;t available, a simple built-in reader still
                 handles plain requests such as &ldquo;less tech&rdquo;, &ldquo;no energy&rdquo; or &ldquo;30% health
                 care&rdquo;.
               </p>

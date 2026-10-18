@@ -23,20 +23,13 @@ import {
   type PlanResult,
 } from "@/lib/planner";
 
-import ChatPanel from "./ChatPanel";
-import ExposurePanel from "./ExposurePanel";
-import HoldingsPanel from "./HoldingsPanel";
-import MovesPanel from "./MovesPanel";
-import PlanPanel, { type MoneyMode } from "./PlanPanel";
+import HoldingsSection from "./HoldingsSection";
+import MixSection from "./MixSection";
+import MovesSection from "./MovesSection";
+import ScytheSection from "./ScytheSection";
 import StatusBar from "./StatusBar";
-import { StatStrip, TickerTape } from "./Strips";
 import TopBar from "./TopBar";
 import { Toasts, type Toast } from "./ui";
-
-function shortDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-}
 
 const EXAMPLE = [
   { ticker: "IVV", name: "iShares Core S&P 500 ETF", amount: 6000 },
@@ -61,8 +54,6 @@ export default function PlannerApp() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [target, setTarget] = useState<Mix | null>(null);
   const [touched, setTouched] = useState<Set<string>>(new Set());
-  const [money, setMoney] = useState<MoneyMode>("same");
-  const [amount, setAmount] = useState(1000);
   const [maxNew, setMaxNew] = useState(2);
   const [result, setResult] = useState<PlanResult | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
@@ -82,7 +73,6 @@ export default function PlannerApp() {
   const dirty = useRef(false);
   const savedId = useRef<string | null>(null);
 
-  const cashChange = money === "add" ? amount : money === "out" ? -amount : 0;
 
   // Load the ETFs we have data for, and the saved portfolio (from ?p= or this browser).
   useEffect(() => {
@@ -123,10 +113,10 @@ export default function PlannerApp() {
     () => ({
       holdings: holdings.filter((h) => h.amount > 0).map((h) => ({ ticker: h.ticker, amount: h.amount })),
       target,
-      cash_change: cashChange,
+      cash_change: 0, // plans always use the money already in the ETFs
       max_new_funds: maxNew,
     }),
-    [holdings, target, cashChange, maxNew],
+    [holdings, target, maxNew],
   );
   useEffect(() => {
     if (!ready) return;
@@ -212,8 +202,6 @@ export default function PlannerApp() {
   const current = useMemo(() => toMix(result?.current), [result]);
   const funds = useMemo(() => new Map((result?.funds ?? []).map((f) => [f.ticker, f])), [result]);
   const plans = target ? result?.plans ?? [] : [];
-  const plan = plans[Math.min(activePlan, plans.length - 1)];
-  const preview = useMemo(() => (plan ? toMix(plan.exposure) : null), [plan]);
   const hasHoldings = (result?.covered_total ?? 0) > 0;
   const distance = target && hasHoldings ? mixDistance(current, target) : null;
   const saveShown: SaveState = !saved && holdings.length === 0 ? "idle" : saveState;
@@ -269,7 +257,6 @@ export default function PlannerApp() {
       if (!holdings.some((h) => h.ticker === m.ticker) && m.after > 0) next.push({ ticker: m.ticker, name: m.name, amount: m.after });
     }
     setHoldings(next);
-    setMoney("same");
     setActivePlan(0);
     highlight(p.moves.map((m) => m.ticker));
     toast(`Applied ${p.moves.length} move${p.moves.length === 1 ? "" : "s"}. Your amounts are updated.`);
@@ -291,10 +278,6 @@ export default function PlannerApp() {
         markDirty();
         setTarget(reply.target);
         setTouched(new Set());
-      }
-      if (reply.cash_change) {
-        setMoney(reply.cash_change > 0 ? "add" : "out");
-        setAmount(Math.abs(reply.cash_change));
       }
       setConnected(reply.source === "claude");
       setTurns((t) => [
@@ -329,23 +312,15 @@ export default function PlannerApp() {
     setTarget(null);
     setTouched(new Set());
     setTurns([]);
-    setMoney("same");
     toast("Cleared. Start a new portfolio.", "info");
   }
 
-  const total = holdings.reduce((a, h) => a + h.amount, 0);
-  const missing = (result?.funds ?? []).filter((f) => f.status === "missing");
-  const largest = (result?.current ?? [])
-    .filter((s) => s.sector !== "Unclassified")
-    .reduce<{ sector: string; weight: number } | null>((best, s) => (!best || s.weight > best.weight ? s : best), null);
   const match = distance === null ? null : 1 - distance;
   const best = plans.length ? plans.reduce((a, b) => (b.distance < a.distance ? b : a)) : null;
-  const dates = (result?.funds ?? []).map((f) => f.as_of_date).filter((d): d is string => Boolean(d)).sort();
-  const asOf = dates.length ? (dates[0] === dates[dates.length - 1] ? shortDate(dates[0]) : `${shortDate(dates[0])} – ${shortDate(dates[dates.length - 1])}`) : null;
   const held = useMemo(() => new Set(holdings.map((h) => h.ticker)), [holdings]);
 
   return (
-    <div className="app-arcs flex h-dvh flex-col bg-canvas">
+    <div className="flex h-dvh flex-col bg-canvas">
       <TopBar
         covered={covered}
         held={held}
@@ -357,71 +332,49 @@ export default function PlannerApp() {
         onShare={copyLink}
         onReset={holdings.length > 0 || saved ? startOver : null}
       />
-      <TickerTape etfs={covered} onPick={addEtf} />
-      <main className="min-h-0 flex-1 overflow-auto lg:overflow-hidden">
-        <div className="flex flex-col gap-2 p-2 lg:h-full">
-          <div className="animate-fade-up">
-            <StatStrip
-              total={total}
-              covered={result?.covered_total ?? 0}
-              etfCount={holdings.length}
-              missingCount={missing.length}
-              largest={largest}
+      <main className="min-h-0 flex-1 overflow-auto lg:grid lg:grid-cols-[288px_minmax(0,1fr)_360px] lg:divide-x lg:divide-line lg:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_420px]">
+        <HoldingsSection
+          holdings={holdings}
+          funds={funds}
+          covered={covered}
+          flash={flash}
+          providerData={providerData}
+          prices={prices}
+          onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
+          onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
+          onAdd={addEtf}
+          onExample={loadExample}
+          onFocusSearch={() => setFocusKey((k) => k + 1)}
+        />
+        <div className="flex flex-col divide-y divide-line border-y border-line lg:min-h-0 lg:border-y-0">
+          <div className="flex flex-col lg:min-h-0 lg:flex-[3]">
+            <MixSection
+              current={current}
+              target={target}
               match={match}
-              bestMatch={best ? 1 - best.distance : null}
-              bestMoved={best ? best.moves.filter((m) => m.action === "reduce" || m.action === "remove").reduce((a, m) => a + m.amount, 0) : null}
-              asOf={asOf}
+              matchAfter={best ? 1 - best.distance : null}
+              funds={result?.funds ?? []}
+              hasHoldings={hasHoldings}
+              onSector={moveSlider}
+              onReset={resetTarget}
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 lg:min-h-0 lg:flex-1 lg:grid-cols-[272px_minmax(0,1fr)_340px] 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
-            <div className="animate-fade-up lg:min-h-0" style={{ animationDelay: "60ms" }}>
-              <HoldingsPanel
-                holdings={holdings}
-                funds={funds}
-                covered={covered}
-                flash={flash}
-                providerData={providerData}
-                prices={prices}
-                onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
-                onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
-                onAdd={addEtf}
-                onExample={loadExample}
-                onFocusSearch={() => setFocusKey((k) => k + 1)}
-              />
-            </div>
-            <div className="flex animate-fade-up flex-col gap-2 lg:min-h-0" style={{ animationDelay: "120ms" }}>
-              <ExposurePanel
-                current={current}
-                target={target}
-                preview={preview}
-                match={match}
-                funds={result?.funds ?? []}
-                hasHoldings={hasHoldings}
-                onSector={moveSlider}
-                onReset={resetTarget}
-              />
-              <MovesPanel plans={plans} active={activePlan} onActive={setActivePlan} hasTarget={target !== null} loading={planning} error={planError} />
-            </div>
-            <div className="flex animate-fade-up flex-col gap-2 lg:min-h-0" style={{ animationDelay: "180ms" }}>
-              <PlanPanel
-                plans={plans}
-                active={activePlan}
-                onActive={setActivePlan}
-                match={match}
-                total={result?.covered_total ?? total}
-                money={money}
-                amount={amount}
-                maxNew={maxNew}
-                onMoney={setMoney}
-                onAmount={setAmount}
-                onMaxNew={setMaxNew}
-                onApply={applyPlan}
-                hasTarget={target !== null}
-              />
-              <ChatPanel turns={turns} busy={chatBusy} onSend={sendChat} connected={connected} />
-            </div>
+          <div className="flex flex-col lg:min-h-0 lg:flex-[2]">
+            <MovesSection
+              plans={plans}
+              active={activePlan}
+              onActive={setActivePlan}
+              hasTarget={target !== null}
+              hasHoldings={hasHoldings}
+              loading={planning}
+              error={planError}
+              maxNew={maxNew}
+              onMaxNew={setMaxNew}
+              onApply={applyPlan}
+            />
           </div>
         </div>
+        <ScytheSection turns={turns} busy={chatBusy} onSend={sendChat} connected={connected} />
       </main>
       <StatusBar />
       <Toasts toasts={toasts} />

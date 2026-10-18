@@ -57,7 +57,6 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type ChatReply = {
   reply: string;
   target: Record<string, number> | null;
-  cash_change: number | null;
   source: "claude" | "rules";
 };
 

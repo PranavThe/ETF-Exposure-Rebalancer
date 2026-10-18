@@ -20,10 +20,10 @@ const ITEMS = [
     ),
   },
   {
-    title: "Does the assistant decide my mix?",
+    title: "Does Scythe, the assistant, decide my mix?",
     body: (
       <p>
-        No. The assistant, Claude, only turns your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
+        No. Scythe runs on Claude and only turns your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
         a target mix you can see and change. Ask it which sector is best and it will tell you the choice is yours. The
         sliders do everything without it.
       </p>

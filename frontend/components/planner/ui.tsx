@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -65,114 +65,6 @@ export function Monogram({ ticker, size = 28 }: { ticker: string; size?: number 
 
 export type Tab = { id: string; label: React.ReactNode; badge?: React.ReactNode };
 
-/** Kairos terminal panel: a tab strip with a sliding underline over a scrolling body. */
-export function Pane({
-  tabs,
-  active,
-  onTab,
-  right,
-  footer,
-  children,
-  className = "",
-  bodyClassName = "",
-}: {
-  tabs: Tab[];
-  active: string;
-  onTab?: (id: string) => void;
-  right?: React.ReactNode;
-  footer?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-  bodyClassName?: string;
-}) {
-  const strip = useRef<HTMLDivElement>(null);
-  const [bar, setBar] = useState<{ left: number; width: number } | null>(null);
-  useLayoutEffect(() => {
-    const el = strip.current?.querySelector<HTMLElement>(`[data-tab="${CSS.escape(active)}"]`);
-    if (!el) return;
-    const measure = () => setBar({ left: el.offsetLeft, width: el.offsetWidth });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [active, tabs.length]);
-
-  return (
-    <section className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-panel/95 transition-colors duration-300 hover:border-line-2/80 shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset] backdrop-blur ${className}`}>
-      <div className="relative flex h-11 shrink-0 items-stretch border-b border-line">
-        <div ref={strip} role="tablist" className="relative flex min-w-0 items-stretch overflow-x-auto">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              data-tab={t.id}
-              aria-selected={t.id === active}
-              onClick={() => onTab?.(t.id)}
-              className={`flex shrink-0 items-center gap-2 px-4 text-[14px] transition-colors duration-200 ${
-                t.id === active ? "text-fg" : "text-faint hover:text-muted"
-              }`}
-            >
-              {t.label}
-              {t.badge !== undefined && (
-                <span className="rounded bg-panel-3 px-1.5 py-px font-mono text-[11px] text-muted">{t.badge}</span>
-              )}
-            </button>
-          ))}
-          {bar && (
-            <span
-              aria-hidden
-              className="absolute bottom-0 h-[2px] rounded-full bg-accent transition-all duration-300 ease-out"
-              style={{ left: bar.left + 12, width: Math.max(0, bar.width - 24) }}
-            />
-          )}
-        </div>
-        {right && <div className="ml-auto flex shrink-0 items-center gap-2 pl-2 pr-3 text-xs text-muted">{right}</div>}
-      </div>
-      <div role="tabpanel" className={`relative min-h-0 flex-1 overflow-auto ${bodyClassName}`}>
-        {children}
-      </div>
-      {footer && <div className="shrink-0 border-t border-line">{footer}</div>}
-    </section>
-  );
-}
-
-export function Segmented<T extends string | number>({
-  value,
-  options,
-  onChange,
-  label,
-  size = "md",
-}: {
-  value: T;
-  options: { value: T; label: React.ReactNode }[];
-  onChange: (v: T) => void;
-  label: string;
-  size?: "sm" | "md";
-}) {
-  return (
-    <div role="radiogroup" aria-label={label} className="flex rounded-md bg-canvas p-0.5 ring-1 ring-line">
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <button
-            key={String(o.value)}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => onChange(o.value)}
-            className={`flex-1 whitespace-nowrap rounded-[5px] font-medium transition-all duration-200 ${size === "sm" ? "px-2 py-1 text-xs" : "px-2 py-1.5 text-[13px]"} ${
-              on ? "bg-panel-3 text-fg shadow-[0_1px_2px_rgba(0,0,0,0.4)]" : "text-faint hover:text-muted"
-            }`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (v: number) => void; label: string }) {
   const btn = "flex h-7 w-7 items-center justify-center rounded text-muted transition-colors hover:bg-panel-3 hover:text-fg disabled:opacity-30";
   return (
@@ -194,7 +86,7 @@ export type Toast = { id: number; text: string; tone?: "ok" | "info" | "error" }
 
 export function Toasts({ toasts }: { toasts: Toast[] }) {
   return (
-    <div aria-live="polite" className="pointer-events-none fixed right-4 top-16 z-50 flex flex-col items-end gap-2">
+    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-12 z-50 flex flex-col items-center gap-2">
       {toasts.map((t) => (
         <div
           key={t.id}
@@ -229,4 +121,62 @@ export function BrandMark({ size = 22 }: { size?: number }) {
 
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`skeleton ${className}`} />;
+}
+
+/** Underlined text tabs for section headers (no boxes). */
+export function TextTabs({ tabs, active, onTab, label }: { tabs: Tab[]; active: string; onTab: (id: string) => void; label: string }) {
+  return (
+    <div role="tablist" aria-label={label} className="flex items-center gap-5">
+      {tabs.map((t) => {
+        const on = t.id === active;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onTab(t.id)}
+            className={`relative flex items-center gap-1.5 pb-1.5 text-[14px] transition-colors ${on ? "text-fg" : "text-faint hover:text-muted"}`}
+          >
+            {t.label}
+            {t.badge !== undefined && <span className={`font-mono text-[12px] ${on ? "text-up" : "text-faint"}`}>{t.badge}</span>}
+            <span
+              aria-hidden
+              className={`absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent transition-opacity duration-200 ${on ? "opacity-100" : "opacity-0"}`}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A section title row: title on the left, controls on the right. */
+export function SectionHeader({ title, sub, right }: { title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[52px] shrink-0 items-center gap-3 px-6 pt-5 pb-3">
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-medium text-fg">{title}</h2>
+        {sub && <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-muted">{sub}</p>}
+      </div>
+      {right && <div className="ml-auto flex shrink-0 items-center gap-3">{right}</div>}
+    </div>
+  );
+}
+
+/** Scythe's mark: a crescent blade on a handle with a grip. */
+export function ScytheMark({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id="scythe" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#7a73f0" />
+          <stop offset="1" stopColor="#d6d3ff" />
+        </linearGradient>
+      </defs>
+      <path d="M17.2 3.6 L12.6 21.5" stroke="url(#scythe)" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M13.9 13.2 L17.6 14.1" stroke="url(#scythe)" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M18.5 3.2 C 12 -0.5, 3.5 2, 1.2 11 C 4.6 6.6, 10.8 5.2, 17.6 6.2 Z" fill="url(#scythe)" />
+    </svg>
+  );
 }

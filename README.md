@@ -2,9 +2,9 @@
 
 FundShift is a one-screen sector-exposure tool for beginner investors. You enter the ETFs you hold
 and the dollars in each; it shows your look-through sector mix (built from each ETF's published
-holdings). You choose the mix you want, with sliders or by telling the assistant in plain words, and
-it suggests the moves that get you there: reduce or increase ETFs you hold, add new ones, add money
-or take money out.
+holdings). You choose the mix you want, with sliders or by telling Scythe, the assistant, in plain
+words, and it suggests the moves that get you there with the money already in your ETFs: reduce or
+increase ETFs you hold, or add new ones.
 
 > You decide the exposure you want. The tool only does the math to get you there.
 
@@ -32,13 +32,13 @@ make web      # second terminal: frontend on http://localhost:3000
 1. `make demo`, `make web`, then open http://localhost:3000/app.
 2. Click **Try an example portfolio** (IVV $6,000, IYW $3,000, ARKK $1,000 when those ETFs have
    holdings loaded), or search for your own ETFs and type the dollars in each.
-3. The middle panel shows your sector mix. Drag a sector's slider to set the mix you want; the
-   sectors you haven't touched adjust so the total stays 100%. Or tell the assistant, for example
-   "less tech, more health care" or "no energy".
-4. The right panel shows the suggested moves for each kind of plan, how close each gets (in pp)
-   and how much money moves. Choose **Add** or **Take out** to plan with new money or a withdrawal,
-   and **New ETFs** to limit how many new ETFs a plan may add. **Use these amounts** applies a plan
-   to your ETFs so you can see the result.
+3. The middle column shows your sector mix. Drag a sector's handle to set the mix you want; the
+   sectors you haven't touched adjust so the total stays 100%. Or tell Scythe (right column), for
+   example "less tech, more health care" or "no energy".
+4. Below the mix, **Suggested moves** shows each plan (rearrange what you own, or add new ETFs), how
+   close it gets, and how much money moves. **New ETFs up to** limits how many new ETFs a plan may
+   add. **Use these amounts** applies a plan to your ETFs so you can see the result. Plans always use
+   the money already in your ETFs; change an amount in your holdings to plan with more or less.
 5. Your portfolio saves to the database automatically; the URL (`/app?p=<id>`) reopens it, and only
    the browser that created it can edit it. Opening someone else's link and changing it saves a copy.
 
@@ -55,7 +55,7 @@ on kairos.trade) in the same project:
 |---|---|
 | `/` | Landing page for the exposure tool |
 | `/methodology` | How exposure, distance and plans are computed, data sources and limitations |
-| `/app` | The whole product on one screen: your ETFs, your sector mix vs your target, suggested moves, assistant |
+| `/app` | The whole product on one screen: your ETFs, your sector mix vs your target, suggested moves, Scythe |
 
 The app lives in `frontend/components/planner` with its API calls in `frontend/lib/planner.ts`.
 The product name lives in `frontend/lib/brand.ts`. Geist and Geist Mono are bundled in
@@ -86,15 +86,16 @@ differences.
 - **Distance** between two mixes is half the sum of absolute differences (0 = identical, 1 = no
   overlap), shown in pp.
 - **Plans** solve for the dollar split closest to your target (a small quadratic program over the
-  allowed ETFs, solved exactly). Each kind restricts the moves: rearrange only what you own;
-  rearrange and add new ETFs; invest new money without reducing anything; take money out only by
-  reducing; or the same with rearranging. New ETFs are added one at a time, each only if it brings
+  allowed ETFs, solved exactly). The app shows two kinds: rearrange only what you own, and
+  rearrange and add new ETFs, both with the money already in your ETFs. (`POST /plan` also accepts
+  a `cash_change` for plans that add or take out money; the app always sends 0.) New ETFs are added one at a time, each only if it brings
   the plan at least 0.5 pp closer; positions under 1% of the portfolio are dropped; amounts are
   whole dollars. Plans that change nothing or repeat another plan are not shown.
-- **The assistant** (`POST /chat`) asks Claude Haiku 5.5 (`claude-haiku-5-5`, JSON-schema output, effort `low`) to turn the
-  message into a full target mix and, if mentioned, money added or taken out. It never picks a mix
-  for the user. Without `ANTHROPIC_API_KEY`, or if the call fails, a small rule-based reader handles
-  plain requests ("less tech", "no energy", "30% financials", "I'm adding $2,000"). Sliders always work.
+- **Scythe, the assistant** (`POST /chat`), asks Claude Haiku 5.5 (`claude-haiku-5-5`, JSON-schema
+  output, effort `low`) to turn the message into a full target mix. It never picks a mix for the user
+  and never adds or takes out money. Without `ANTHROPIC_API_KEY`, or if the call fails, a small
+  rule-based reader handles plain requests ("less tech", "no energy", "30% financials"). Sliders
+  always work.
 
 ## Holdings-change analysis
 
@@ -187,7 +188,7 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 | `GET /portfolios/{id}/analysis` | weighted top holdings, overlap, sectors, asset classes, coverage, and latest dates |
 | `GET /etfs/covered` | ETFs with holdings data and their sector mix (`sample: true` marks test fixtures) |
 | `POST /plan` | `{holdings: [{ticker, amount}], target?, cash_change?, max_new_funds?}` → your sector mix, distance to the target, and plans with moves |
-| `POST /chat` | `{message, history?, current?, target?, total?}` → `{reply, target, cash_change, source}`; `source` is `claude` or `rules` |
+| `POST /chat` | `{message, history?, current?, target?, total?}` → `{reply, target, source}`; `source` is `claude` or `rules` |
 | `GET /portfolios/{id}/preferences` | the saved dollar value and target mix |
 | `PUT /portfolios/{id}/preferences` | save the dollar value and target mix; requires `X-Portfolio-Edit-Key` |
 
@@ -247,7 +248,7 @@ One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on
    `NEXT_PUBLIC_API_URL` for the Preview environment in the frontend project.
 3. Redeploy the API.
 
-**4. Turn on the assistant (optional)**
+**4. Turn on Scythe, the assistant (optional)**
 In the API project add `ANTHROPIC_API_KEY` (from console.anthropic.com) and redeploy. Without it,
 `/chat` uses the rule-based reader and the app labels its replies "simple reader".
 

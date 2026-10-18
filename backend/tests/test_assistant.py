@@ -39,12 +39,12 @@ def test_tidy_maps_labels_and_rescales():
 
 
 def test_claude_reading_becomes_a_fraction_target():
-    client = FakeClient({"reply": "Tech down to 40%, health care up to 30%.", "changed": True, "cash_change": None,
+    client = FakeClient({"reply": "Tech down to 40%, health care up to 30%.", "changed": True,
                          "target": [{"sector": "Technology", "percent": 40}, {"sector": "Health Care", "percent": 30},
                                     {"sector": "Financials", "percent": 20}, {"sector": "Energy", "percent": 10}]})
     result = ask_claude(client, "less tech more health care", [{"role": "user", "content": "hi"},
                         {"role": "assistant", "content": "Hello"}], BASE, None, 10000)
-    assert result.source == "claude" and result.cash_change is None
+    assert result.source == "claude"
     assert result.target == pytest.approx({"Technology": 0.4, "Health Care": 0.3, "Financials": 0.2, "Energy": 0.1})
     [call] = client.calls
     assert call["model"] == MODEL == "claude-haiku-5-5"
@@ -56,7 +56,7 @@ def test_claude_reading_becomes_a_fraction_target():
 
 
 def test_larger_models_get_the_server_side_refusal_fallback():
-    client = FakeClient({"reply": "Set.", "changed": False, "target": [], "cash_change": None})
+    client = FakeClient({"reply": "Set.", "changed": False, "target": []})
     ask_claude(client, "hi", [], BASE, None, 0, model="claude-sonnet-5-5")
     [call] = client.calls
     assert call["endpoint"] == "beta" and call["model"] == "claude-sonnet-5-5"
@@ -64,7 +64,7 @@ def test_larger_models_get_the_server_side_refusal_fallback():
 
 
 def test_claude_unchanged_reading_and_refusal_keep_the_target():
-    client = FakeClient({"reply": "It's your call.", "changed": False, "target": [], "cash_change": None})
+    client = FakeClient({"reply": "It's your call.", "changed": False, "target": []})
     assert ask_claude(client, "what should I own?", [], BASE, None, 0).target is None
     refused = ask_claude(FakeClient(stop_reason="refusal"), "x", [], BASE, None, 0)
     assert refused.target is None and "sliders" in refused.reply
@@ -99,15 +99,14 @@ def test_rules_sizes_and_new_sector():
 
 
 def test_rules_money_and_unknown_text():
-    added = rule_based("I want to add $2,000", BASE)
-    assert added.target is None and added.cash_change == 2000
-    taken = rule_based("I need to take out 1.5k", BASE)
-    assert taken.cash_change == -1500
+    # Plans always use the money already in the ETFs, so money talk never changes anything.
+    for message in ("I want to add $2,000", "I need to take out 1.5k"):
+        result = rule_based(message, BASE)
+        assert result.target is None and "dollar amount" in result.reply
     both = rule_based("invest $500 and more energy", BASE)
-    assert both.cash_change == 500 and close(both.target["Energy"], 0.15)
+    assert close(both.target["Energy"], 0.15) and "money already in your ETFs" in both.reply
     nothing = rule_based("hello there", BASE)
-    assert nothing.target is None and nothing.cash_change is None and "sector" in nothing.reply
-
+    assert nothing.target is None and "sector" in nothing.reply
 
 def test_chat_route_uses_rules_without_a_key(client, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -125,12 +124,12 @@ def test_chat_route_with_claude_and_fallback_on_error(client):
     from backend.app.main import app
     from backend.app.routes.chat import get_client
 
-    fake = FakeClient({"reply": "Set.", "changed": True, "cash_change": 1000,
+    fake = FakeClient({"reply": "Set.", "changed": True,
                        "target": [{"sector": "Utilities", "percent": 100}]})
     app.dependency_overrides[get_client] = lambda: fake
     try:
         body = client.post("/chat", json={"message": "all utilities, adding $1000", "total": 5000}).json()
-        assert body == {"reply": "Set.", "target": {"Utilities": 1.0}, "cash_change": 1000.0, "source": "claude"}
+        assert body == {"reply": "Set.", "target": {"Utilities": 1.0}, "source": "claude"}
 
         broken = FakeClient(error=anthropic.APIConnectionError(request=None))
         app.dependency_overrides[get_client] = lambda: broken

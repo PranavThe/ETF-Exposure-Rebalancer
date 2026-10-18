@@ -157,7 +157,7 @@ export function ExposureMock() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Target: the assistant turns words into numbers; the sliders show now vs. target.
+// Target: Scythe turns words into numbers; the sliders show now vs. target.
 
 const TARGET_ROWS = [
   { sector: "Technology", now: 0.5256, target: 0.4756 },
@@ -220,7 +220,7 @@ export function TargetMock() {
             <svg aria-hidden viewBox="0 0 12 12" width="11" height="11" className="text-accent">
               <path d="M6 0.5L7.3 4.7L11.5 6L7.3 7.3L6 11.5L4.7 7.3L0.5 6L4.7 4.7Z" fill="currentColor" />
             </svg>
-            <span className="label">Assistant</span>
+            <span className="label">Scythe</span>
           </div>
           <p className="mt-2 text-[14px] leading-relaxed text-fg/90">
             Done. Your target is now Technology {pct(0.4756)}{" "}
@@ -259,7 +259,7 @@ export function TargetMock() {
 
       <div aria-hidden className="flex items-center gap-2 border-t border-line px-4 py-3 sm:px-5">
         <span className="flex h-9 min-w-0 flex-1 items-center truncate rounded-md border border-line bg-canvas px-3 text-[13px] text-faint">
-          Tell the assistant the mix you want…
+          Tell Scythe the mix you want…
         </span>
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-fg text-canvas">
           <svg viewBox="0 0 12 12" width="11" height="11">

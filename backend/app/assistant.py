@@ -1,4 +1,4 @@
-"""The assistant: turns what the user says into a target sector mix (and money in or out).
+"""Scythe, the assistant: turns what the user says into a target sector mix.
 
 It never chooses a mix for the user. Claude reads the message when ANTHROPIC_API_KEY is set; without
 a key a small rule-based reader handles plain requests ("less tech", "no energy", "30% health care").
@@ -25,12 +25,15 @@ Sector = Literal[
     "Cash & other",
 ]
 
-SYSTEM_PROMPT = f"""You help a beginner investor set the sector mix they want for their ETF portfolio.
+SYSTEM_PROMPT = f"""You are Scythe. You help a beginner investor set the sector mix they want for their
+ETF portfolio.
 
-The user decides what they want. Your only job is to turn their words into a target mix and, when
-they mention it, an amount of money they are adding or taking out. Never suggest what mix they
-should want, never say whether a sector is a good or bad idea, and never predict markets. If they ask
-for advice, say kindly that the choice is theirs, and offer to explain what a sector contains.
+The user decides what they want. Your only job is to turn their words into a target mix. Never
+suggest what mix they should want, never say whether a sector is a good or bad idea, and never
+predict markets. If they ask for advice, say kindly that the choice is theirs, and offer to explain
+what a sector contains. The plans always work with the money already in their ETFs; if they mention
+adding or taking out money, tell them to change that ETF's dollar amount in their holdings list, and
+leave the mix unchanged.
 
 Each turn you get their current mix (from the ETFs they hold), their current target if they set one,
 and their message. Start from the current target (or the current mix if there is none), change only
@@ -59,14 +62,11 @@ class Reading(BaseModel):
     reply: str
     changed: bool = Field(description="True when this message changes the target mix")
     target: list[SectorPercent] = Field(description="The full target mix in percent; empty if unchanged")
-    cash_change: float | None = Field(
-        description="Dollars the user is adding (positive) or taking out (negative); null if not mentioned")
 
 
 class AssistantResult(BaseModel):
     reply: str
     target: dict[str, float] | None  # fractions summing to 1; None when the message changes nothing
-    cash_change: float | None
     source: Literal["claude", "rules"]
 
 
@@ -114,12 +114,11 @@ def ask_claude(client, message: str, history: list[dict], current: dict[str, flo
         response = client.messages.create(**request)
     if response.stop_reason == "refusal":
         return AssistantResult(reply="I can't help with that one, but the sliders still work.",
-                               target=None, cash_change=None, source="claude")
+                               target=None, source="claude")
     text = next((b.text for b in response.content if b.type == "text"), "")
     reading = Reading.model_validate(json.loads(text))
     mix = tidy({p.sector: p.percent for p in reading.target}) if reading.changed else None
-    cash = reading.cash_change if reading.cash_change and math.isfinite(reading.cash_change) else None
-    return AssistantResult(reply=reading.reply.strip(), target=mix, cash_change=cash, source="claude")
+    return AssistantResult(reply=reading.reply.strip(), target=mix, source="claude")
 
 
 READING_SCHEMA = {
@@ -139,9 +138,8 @@ READING_SCHEMA = {
                 "additionalProperties": False,
             },
         },
-        "cash_change": {"type": ["number", "null"]},
     },
-    "required": ["reply", "changed", "target", "cash_change"],
+    "required": ["reply", "changed", "target"],
     "additionalProperties": False,
 }
 
@@ -172,21 +170,12 @@ _BIG = re.compile(r"\b(a lot|much|way|significantly|lots)\b")
 _SMALL = re.compile(r"\b(a bit|a little|slightly|bit)\b")
 _PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s*(?:%|percent\b)")
 _PP = re.compile(r"(\d+(?:\.\d+)?)\s*(?:pp|points?|percentage points?)\b")
-_MONEY = re.compile(r"\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand)?\b")
-_ADD_MONEY = re.compile(r"\b(add|adding|invest|investing|put in|deposit|top up)\b")
-_TAKE_MONEY = re.compile(r"\b(take out|taking out|withdraw|withdrawing|pull out|cash out|need)\b")
-
-
-def _cash(text: str) -> float | None:
-    if not (_ADD_MONEY.search(text) or _TAKE_MONEY.search(text)) or _SECTOR_RE.search(text):
-        return None
-    for m in _MONEY.finditer(text):
-        if "$" not in m.group(0) and not m.group(2):
-            continue  # bare numbers are probably percentages, not dollars
-        amount = float(m.group(1).replace(",", "")) * (1000 if m.group(2) else 1)
-        if amount > 0:
-            return -amount if _TAKE_MONEY.search(text) else amount
-    return None
+# Money talk: a dollar amount, or "1.5k", next to adding or taking out.
+_MONEY = re.compile(r"\$\s*\d|\b\d[\d,.]*\s*(k|thousand|grand)\b")
+_MONEY_VERB = re.compile(r"\b(add|adding|invest|investing|put in|deposit|top up|take out|taking out|withdraw|"
+                         r"withdrawing|pull out|cash out|need)\b")
+MONEY_REPLY = ("Plans always use the money already in your ETFs. If you've added or taken out money, change "
+               "that ETF's dollar amount in your holdings, and I'll keep your target as it is.")
 
 
 def rule_based(message: str, base: dict[str, float]) -> AssistantResult:
@@ -194,12 +183,12 @@ def rule_based(message: str, base: dict[str, float]) -> AssistantResult:
     text = message.lower().replace("’", "'")
     fixed: dict[str, float] = {}
     shifts: dict[str, float] = {}
-    cash: float | None = None
+    money = False
     # Commas inside numbers ("$2,000") and decimal points ("2.5%") don't end a clause.
     for clause in re.split(r",(?!\d{3}\b)|[;!?\n]|\.(?!\d)|\band\b|\bbut\b|\bwhile\b", text):
         sectors = [_LOOKUP[m.group(1)] for m in _SECTOR_RE.finditer(clause)]
         if not sectors:
-            cash = cash if cash is not None else _cash(clause)
+            money = money or bool(_MONEY.search(clause) and _MONEY_VERB.search(clause))
             continue
         percent, pp = _PERCENT.search(clause), _PP.search(clause)
         for sector in sectors:
@@ -215,14 +204,12 @@ def rule_based(message: str, base: dict[str, float]) -> AssistantResult:
                 shifts[sector] = shifts.get(sector, 0.0) + (-step if _LESS.search(clause) else step)
 
     if not fixed and not shifts:
-        if cash is not None:
-            verb = "adding" if cash > 0 else "taking out"
-            return AssistantResult(reply=f"Got it: {verb} ${abs(cash):,.0f}. Your target mix stays the same.",
-                                   target=None, cash_change=cash, source="rules")
+        if money:
+            return AssistantResult(reply=MONEY_REPLY, target=None, source="rules")
         return AssistantResult(
             reply=("I can change your target when you name a sector, like \"less tech, more health care\", "
                    "\"no energy\" or \"30% financials\". The sliders work too."),
-            target=None, cash_change=None, source="rules")
+            target=None, source="rules")
 
     mix = {s: base.get(s, 0.0) for s in TARGET_SECTORS}
     for sector, step in shifts.items():
@@ -241,11 +228,11 @@ def rule_based(message: str, base: dict[str, float]) -> AssistantResult:
     mix_after = tidy(target)
     if mix_after is None:
         return AssistantResult(reply="That would leave nothing in any sector, so I left your target as it was.",
-                               target=None, cash_change=cash, source="rules")
+                               target=None, source="rules")
     changes = [f"{s} {base.get(s, 0.0) * 100:.0f}% → {mix_after.get(s, 0.0) * 100:.0f}%" for s in fixed]
     reply = "Done: " + ", ".join(changes) + "."
     if rest_total > 0 and pinned < 1 and len(fixed) < len(TARGET_SECTORS):
         reply += " The other sectors were scaled so the total stays 100%."
-    if cash is not None:
-        reply += f" I also noted {'adding' if cash > 0 else 'taking out'} ${abs(cash):,.0f}."
-    return AssistantResult(reply=reply, target=mix_after, cash_change=cash, source="rules")
+    if money:
+        reply += " Plans use the money already in your ETFs; change an amount in your holdings to add or take out money."
+    return AssistantResult(reply=reply, target=mix_after, source="rules")
