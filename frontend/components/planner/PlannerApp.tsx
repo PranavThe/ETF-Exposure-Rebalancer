@@ -512,14 +512,52 @@ export default function PlannerApp() {
 
   async function renameTab(id: string, name: string) {
     const tab = tabs.find((item) => item.id === id);
-    if (!tab?.key) return;
+    if (!tab || switching) return;
+    const isActive = id === activeTabId;
+    if (isActive) cancelPendingChat();
+    setSwitching(true);
     try {
-      if (id === activeTabId) await persistCurrent();
-      await renamePortfolio({ id, key: tab.key }, name);
-      setTabs((current) => current.map((item) => item.id === id ? { ...item, name } : item));
-      if (id === activeTabId) setPortfolioName(name);
+      let portfolioId = id;
+      let place = { id: tab.id, key: tab.key };
+      let data: Awaited<ReturnType<typeof loadPortfolio>>;
+
+      if (isActive) {
+        await persistCurrent();
+        portfolioId = savedId.current ?? id;
+        place = rememberedPortfolio(portfolioId) ?? place;
+        data = { name: portfolioName, holdings, target };
+      } else if (!place.key) {
+        data = await loadPortfolio(id);
+      } else {
+        data = { name: tab.name, holdings: [], target: null };
+      }
+
+      if (place.key) {
+        await renamePortfolio(place, name);
+        setTabs((current) => current.map((item) => item.id === portfolioId
+          ? { ...item, name }
+          : item));
+      } else {
+        // A shared link has no edit key. Renaming is still a user edit, so fork it first.
+        const { place: copy } = await savePortfolio(null, data.holdings, data.target, name);
+        setTabs((current) => current.map((item) => item.id === id
+          ? { ...item, id: copy.id, name, key: copy.key }
+          : item));
+        if (isActive) {
+          dirty.current = false;
+          savedId.current = copy.id;
+          setActiveTabId(copy.id);
+          setSaved(copy);
+          setUrl(copy.id);
+          setSaveState("saved");
+        }
+        toast("Renamed in your own copy. The shared portfolio was left unchanged.", "info");
+      }
+      if (isActive) setPortfolioName(name);
     } catch {
       toast("Couldn’t rename this portfolio. Please try again.", "error");
+    } finally {
+      setSwitching(false);
     }
   }
 

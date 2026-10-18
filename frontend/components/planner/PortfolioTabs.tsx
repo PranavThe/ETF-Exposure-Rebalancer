@@ -51,7 +51,6 @@ export default function PortfolioTabs({
       >
         {tabs.map((tab, index) => {
           const active = tab.id === activeId;
-          const canRename = Boolean(tab.key);
           return (
             <div
               key={tab.id}
@@ -94,10 +93,10 @@ export default function PortfolioTabs({
                   role="tab"
                   aria-selected={active}
                   aria-controls="planner-portfolio-panel"
-                  title={canRename ? `${tab.name} — double-click to rename, drag to reorder` : `${tab.name} — drag to reorder`}
+                  title={`${tab.name} — double-click to rename, drag to reorder`}
                   disabled={disabled}
                   onClick={() => onSelect(tab.id)}
-                  onDoubleClick={() => canRename && beginRename(tab)}
+                  onDoubleClick={() => beginRename(tab)}
                   onKeyDown={(event) => {
                     if (event.altKey && event.key === "ArrowLeft" && index > 0) {
                       event.preventDefault();
@@ -112,11 +111,11 @@ export default function PortfolioTabs({
                   {tab.name}
                 </button>
               )}
-              {canRename && editing !== tab.id && (
+              {editing !== tab.id && (
                 <button
                   type="button"
                   aria-label={`Rename ${tab.name}`}
-                  title="Rename portfolio"
+                  title="Rename portfolio (shared portfolios are copied first)"
                   disabled={disabled}
                   onClick={() => beginRename(tab)}
                   className="px-1 text-[11px] text-faint hover:text-fg disabled:cursor-wait"
