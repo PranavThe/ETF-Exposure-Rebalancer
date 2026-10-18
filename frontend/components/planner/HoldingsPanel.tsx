@@ -1,5 +1,6 @@
 "use client";
 
+import type { ProviderHoldingChanges, ProviderPrice } from "@/lib/api";
 import { pct } from "@/lib/format";
 import { usd, type CoveredEtf, type Holding, type PlanFund } from "@/lib/planner";
 
@@ -7,12 +8,47 @@ import AmountInput from "./AmountInput";
 import { EtfSearch } from "./TopBar";
 import { AnimatedNumber, Monogram, Pane } from "./ui";
 
+const SOURCE: Record<string, string> = { sec: "SEC filing", issuer: "Issuer file", tickerinside: "TickerInside" };
+
+/** The largest positions TickerInside reports for a fund, with the latest IEX closing price. */
+function TopHoldings({ data, prices }: { data: ProviderHoldingChanges; prices: Map<string, ProviderPrice> }) {
+  return (
+    <details className="group/top mt-2 ml-[40px] rounded-md bg-canvas px-2.5 py-1.5 text-[11px] text-muted ring-1 ring-line">
+      <summary className="cursor-pointer list-none select-none text-faint transition-colors hover:text-fg">
+        <span className="inline-block transition-transform group-open/top:rotate-90">›</span> Top holdings
+      </summary>
+      <ul className="mt-1.5 space-y-1">
+        {data.holdings.slice(0, 5).map((item) => {
+          const price = prices.get(item.ticker);
+          return (
+            <li key={item.ticker} className="flex justify-between gap-2 font-mono">
+              <span className="text-fg">
+                {item.ticker} <span className="text-muted">{pct(item.weight)}</span>
+              </span>
+              <span className="text-faint">{price ? `$${price.close.toFixed(2)}` : "—"}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {data.no_longer_reported.length > 0 && (
+        <p className="mt-1.5 leading-relaxed text-faint">
+          No longer listed since {data.previous_as_of_date}: {data.no_longer_reported.slice(0, 5).map((item) => item.ticker).join(", ")}
+          {data.no_longer_reported.length > 5 ? " …" : ""}. A change in what is reported isn’t necessarily portfolio activity.
+        </p>
+      )}
+      <p className="mt-1.5 text-faint">Weights from TickerInside; prices are Alpaca IEX closes.</p>
+    </details>
+  );
+}
+
 /** Left column: the ETFs the user holds and the dollars in each. */
 export default function HoldingsPanel({
   holdings,
   funds,
   covered,
   flash,
+  providerData,
+  prices,
   onAmount,
   onRemove,
   onAdd,
@@ -23,6 +59,8 @@ export default function HoldingsPanel({
   funds: Map<string, PlanFund>;
   covered: CoveredEtf[];
   flash: Set<string>;
+  providerData: Map<string, ProviderHoldingChanges>;
+  prices: Map<string, ProviderPrice>;
   onAmount: (ticker: string, amount: number) => void;
   onRemove: (ticker: string) => void;
   onAdd: (etf: { ticker: string; name: string }) => void;
@@ -136,6 +174,13 @@ export default function HoldingsPanel({
                     Its holdings aren’t loaded yet, so it stays out of your mix and the moves.
                   </p>
                 )}
+                {fund?.as_of_date && (
+                  <p className="mt-1.5 pl-[40px] font-mono text-[10px] text-faint">
+                    {SOURCE[fund.source_provider ?? ""] ?? "Holdings"}
+                    {fund.source_layer ? ` · ${fund.source_layer}` : ""} · as of {fund.as_of_date}
+                  </p>
+                )}
+                {providerData.get(h.ticker) && <TopHoldings data={providerData.get(h.ticker)!} prices={prices} />}
               </li>
             );
           })}

@@ -82,7 +82,7 @@ function EtfSearch({
     const seen = new Set(fromCovered.map((o) => o.ticker));
     const fromSearch = (found?.term === term ? found.funds : [])
       .filter((f) => !seen.has(f.ticker))
-      .map((f) => ({ ticker: f.ticker, name: f.name, covered: byTicker.get(f.ticker), hasData: f.snapshot_count > 0 }));
+      .map((f) => ({ ticker: f.ticker, name: f.name, covered: byTicker.get(f.ticker), hasData: f.snapshot_count > 0 || Boolean(f.provider_holdings_as_of_date) }));
     return [...fromCovered, ...fromSearch]
       .filter((o) => !held.has(o.ticker))
       .sort((a, b) => rank(a.ticker) - rank(b.ticker) || Number(b.hasData) - Number(a.hasData))

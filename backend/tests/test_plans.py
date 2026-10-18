@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.db import get_engine
 from backend.app.main import app
-from backend.app.models import Fund, Holding, Snapshot
+from backend.app.models import (Fund, Holding, ProviderHolding, ProviderHoldingsSnapshot,
+                                Snapshot)
 from backend.app.routes.plans import suggestable_etfs
 
 
@@ -42,7 +43,9 @@ def add_holdings(ticker: str, rows: list[tuple[str, str, str | None, float]],
         session.add(snapshot)
         session.flush()
         for security_id, name, sector, value in rows:
-            session.add(Holding(snapshot_id=snapshot.id, security_id=security_id, name=name,
+            # The security id doubles as the stock ticker, so provider weights can find the sector.
+            session.add(Holding(snapshot_id=snapshot.id, security_id=security_id, ticker=security_id,
+                                name=name,
                                 asset_class="equity", source_sector=sector, shares=1, price=value,
                                 market_value=value))
 
@@ -67,6 +70,33 @@ def test_covered_lists_funds_with_holdings_and_flags_samples(client):
     assert by_ticker["TECHX"]["sectors"] == [{"sector": "Technology", "weight": 1.0}]
     for etf in body:
         assert close(sum(s["weight"] for s in etf["sectors"]), 1)
+
+
+def test_planner_uses_newer_tickerinside_weights_and_preserves_provenance(client, allow):
+    allow("MIXED")
+    add_fund("MIXED", {"Technology": 100})
+    with Session(get_engine()) as session, session.begin():
+        snapshot = ProviderHoldingsSnapshot(
+            provider="tickerinside", fund_ticker="MIXED", fund_name="Mixed Fund",
+            as_of_date=date(2026, 10, 17), source_layer="issuer", source_url="https://example.test",
+            cite_as="TickerInside", content_hash="provider-mixed",
+        )
+        session.add(snapshot)
+        session.flush()
+        session.add_all([
+            ProviderHolding(snapshot_id=snapshot.id, ticker="MIXED0", weight=0.75),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="UNSEEN", weight=0.25),
+        ])
+
+    covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
+    assert covered["MIXED"]["source_provider"] == "tickerinside"
+    assert covered["MIXED"]["as_of_date"] == "2026-10-17"
+    assert mix(covered["MIXED"]["sectors"]) == {"Technology": 0.75, "Unclassified": 0.25}
+
+    response = client.post("/plan", json={"holdings": [{"ticker": "MIXED", "amount": 1000}]})
+    fund_row = next(row for row in response.json()["funds"] if row["ticker"] == "MIXED")
+    assert fund_row["source_provider"] == "tickerinside"
+    assert fund_row["source_layer"] == "issuer"
 
 
 def test_plan_without_target_reports_current_mix(client):
@@ -214,3 +244,24 @@ def test_held_funds_off_the_allowlist_still_count(client, allow):
     assert plan["kind"] == "rearrange" and plan["new_funds"] == []
     assert [(m["ticker"], m["action"], m["amount"]) for m in plan["moves"]] == [
         ("TECHX", "reduce", 3000), ("HLTHX", "increase", 3000)]
+
+
+def test_provider_tickers_take_their_sector_from_the_reference_file(client, allow):
+    allow("WTONLY")
+    with Session(get_engine()) as session, session.begin():
+        session.add(Fund(ticker="WTONLY", name="Weights Only Fund", issuer="Test Issuer"))
+        snapshot = ProviderHoldingsSnapshot(
+            provider="tickerinside", fund_ticker="WTONLY", fund_name="Weights Only Fund",
+            as_of_date=date(2026, 10, 17), source_layer="issuer", source_url="https://example.test",
+            cite_as="TickerInside", content_hash="provider-wtonly",
+        )
+        session.add(snapshot)
+        session.flush()
+        session.add_all([
+            ProviderHolding(snapshot_id=snapshot.id, ticker="AAPL", weight=0.5),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="XOM", weight=0.3),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="BRK.B", weight=0.2),
+        ])
+    covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
+    assert mix(covered["WTONLY"]["sectors"]) == pytest.approx(
+        {"Technology": 0.5, "Energy": 0.3, "Financials": 0.2})

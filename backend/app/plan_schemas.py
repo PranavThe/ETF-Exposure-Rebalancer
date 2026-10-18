@@ -42,6 +42,8 @@ class PlanFund(BaseModel):
     amount: float
     status: str  # available | missing (no holdings data)
     as_of_date: date | None
+    source_provider: str | None = None
+    source_layer: str | None = None
     sectors: list[SectorWeight]
 
 
@@ -81,6 +83,8 @@ class CoveredEtf(BaseModel):
     name: str
     issuer: str
     as_of_date: date
+    source_provider: str
+    source_layer: str | None = None
     sample: bool
     sectors: list[SectorWeight]
 

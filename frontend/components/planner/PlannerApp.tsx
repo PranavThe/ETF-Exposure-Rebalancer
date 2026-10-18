@@ -3,6 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { api, type ProviderHoldingChanges, type ProviderPrice } from "@/lib/api";
+
 import {
   forgetLast,
   loadPortfolio,
@@ -75,6 +77,8 @@ export default function PlannerApp() {
   const [flash, setFlash] = useState<Set<string>>(new Set());
   const [focusKey, setFocusKey] = useState(0);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [providerData, setProviderData] = useState<Map<string, ProviderHoldingChanges>>(() => new Map());
+  const [prices, setPrices] = useState<Map<string, ProviderPrice>>(() => new Map());
   const dirty = useRef(false);
   const savedId = useRef<string | null>(null);
 
@@ -148,6 +152,27 @@ export default function PlannerApp() {
       controller.abort();
     };
   }, [request, ready]);
+
+  // For ETFs whose mix comes from TickerInside, fetch their top holdings and latest IEX prices.
+  const providerTickers = useMemo(() => {
+    const fromProvider = new Set((result?.funds ?? []).filter((f) => f.source_provider === "tickerinside").map((f) => f.ticker));
+    return holdings.map((h) => h.ticker).filter((t) => fromProvider.has(t)).join(",");
+  }, [holdings, result]);
+  useEffect(() => {
+    if (!providerTickers) return;
+    const controller = new AbortController();
+    Promise.all(providerTickers.split(",").map((t) => api.providerHoldingChanges(t, controller.signal).catch(() => null))).then(
+      async (rows) => {
+        if (controller.signal.aborted) return;
+        setProviderData(new Map(rows.filter((r): r is ProviderHoldingChanges => r !== null).map((r) => [r.fund, r])));
+        const symbols = [...new Set(rows.flatMap((r) => r?.holdings.slice(0, 5).map((h) => h.ticker) ?? []))];
+        if (symbols.length === 0) return;
+        const response = await api.providerPrices(symbols, controller.signal).catch(() => null);
+        if (!controller.signal.aborted && response) setPrices(new Map(response.prices.map((p) => [p.ticker, p])));
+      },
+    );
+    return () => controller.abort();
+  }, [providerTickers]);
 
   // Save to the database a moment after the user stops editing.
   useEffect(() => {
@@ -355,6 +380,8 @@ export default function PlannerApp() {
                 funds={funds}
                 covered={covered}
                 flash={flash}
+                providerData={providerData}
+                prices={prices}
                 onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
                 onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
                 onAdd={addEtf}

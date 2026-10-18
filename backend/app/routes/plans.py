@@ -24,10 +24,11 @@ from backend.analytics.rebalance import (
     suggestable,
 )
 from backend.analytics.sectors import resolve_sector
-from backend.pipeline.reference import read_name_sectors
+from backend.pipeline.reference import normalize_symbol, read_name_sectors, read_ticker_sectors
 
 from ..db import get_session
-from ..models import Fund, Holding, PortfolioPreference, Snapshot, utcnow
+from ..models import (Fund, Holding, PortfolioPreference, ProviderHolding, ProviderHoldingsSnapshot,
+                      Snapshot, utcnow)
 from ..plan_schemas import CoveredEtf, PlanIn, PlanResult, PreferencesIn, PreferencesOut
 from .funds import sector_map
 from .portfolios import portfolio_or_404, require_edit_key
@@ -46,6 +47,17 @@ def suggestable_etfs() -> frozenset[str]:
 def name_sectors() -> NameSectors:
     """Company name -> sector, for holdings without one (data/reference/name_sectors.csv)."""
     return NameSectors(read_name_sectors())
+
+
+@cache
+def reference_ticker_sectors() -> dict[str, str]:
+    """Stock ticker -> sector from the same reference file, for weight-only provider holdings."""
+    return read_ticker_sectors()
+
+
+# ticker -> (fund, as of date, sector mix, source provider, source layer). The provider is "sec" for
+# N-PORT filings, "issuer" for issuer files and "tickerinside" for TickerInside weights.
+Entry = tuple[Fund, date, dict[str, float], str, str | None]
 
 
 @dataclass
@@ -133,8 +145,8 @@ def _mix(rows: tuple[list[EquityRow], float], by_security: dict[str, str]) -> di
 
 
 def load_universe(session: Session, tickers: Iterable[str], allow: frozenset[str],
-                  include_samples: bool = False) -> dict[str, tuple[Fund, date, dict[str, float]]]:
-    """ticker -> (fund, as_of_date, sector mix) for `tickers` and the allowlist `allow`.
+                  include_samples: bool = False) -> dict[str, Entry]:
+    """ticker -> Entry for `tickers` and the allowlist `allow`.
 
     Only those funds' latest snapshots are read. The allowlisted funds are always loaded: they are
     the candidates for new ETFs, and the sectors their holdings resolve to also classify the same
@@ -156,8 +168,74 @@ def load_universe(session: Session, tickers: Iterable[str], allow: frozenset[str
         rows = _load_rows(session, [s.id for s in missing])
         for s in missing:
             state.mixes[(s.id, s.content_hash)] = _mix(rows[s.id], state.by_security)
-    return {f.ticker: (f, s.as_of_date, state.mixes[(s.id, s.content_hash)])
-            for f, s in pairs if state.mixes[(s.id, s.content_hash)]}
+    universe: dict[str, Entry] = {
+        f.ticker: (f, s.as_of_date, state.mixes[(s.id, s.content_hash)],
+                   "sec" if "sec.gov" in (s.source_url or "").lower() else "issuer", None)
+        for f, s in pairs if state.mixes[(s.id, s.content_hash)]}
+    universe.update(_provider_entries(session, set(tickers) | allow, universe))
+    return universe
+
+
+# Sector mix per TickerInside snapshot (id, content hash); snapshots are never edited in place.
+_provider_mixes: dict[tuple[int, str], dict[str, float]] = {}
+
+
+def _ticker_sectors(session: Session, symbols: set[str]) -> dict[str, str]:
+    """Provider symbol -> sector: the newest sector our issuer/SEC rows give that ticker, else the
+    reference file's. Symbols neither knows stay Unclassified rather than getting a guessed sector."""
+    out: dict[str, str] = {}
+    table = sector_map(session)
+    for row in session.execute(
+        select(Holding.ticker, Holding.security_id, Holding.source_sector, Holding.asset_class)
+        .join(Snapshot, Snapshot.id == Holding.snapshot_id)
+        .where(Holding.ticker.in_(sorted(symbols)))
+        .order_by(Snapshot.as_of_date.desc(), Holding.id.desc())
+    ):
+        if row.ticker in out:
+            continue
+        sector = (canonical_sector(resolve_sector(row.security_id, row.source_sector, table))
+                  if row.asset_class == "equity" else "Cash & other")
+        if sector != UNCLASSIFIED:
+            out[row.ticker] = sector
+    reference = reference_ticker_sectors()
+    for symbol in symbols:
+        out.setdefault(symbol, reference.get(normalize_symbol(symbol), UNCLASSIFIED))
+    return out
+
+
+def _provider_entries(session: Session, tickers: set[str], filed: dict[str, Entry]) -> dict[str, Entry]:
+    """TickerInside weights for `tickers`, where they are newer than the issuer/SEC snapshot."""
+    latest: dict[str, ProviderHoldingsSnapshot] = {}
+    for snap in session.scalars(
+        select(ProviderHoldingsSnapshot)
+        .where(ProviderHoldingsSnapshot.provider == "tickerinside",
+               ProviderHoldingsSnapshot.fund_ticker.in_(sorted(tickers)))
+        .order_by(ProviderHoldingsSnapshot.fund_ticker, ProviderHoldingsSnapshot.as_of_date.desc(),
+                  ProviderHoldingsSnapshot.fetched_at.desc())
+    ):
+        latest.setdefault(snap.fund_ticker, snap)
+    newer = {t: snap for t, snap in latest.items() if t not in filed or snap.as_of_date > filed[t][1]}
+    if not newer:
+        return {}
+    todo = [snap for snap in newer.values() if (snap.id, snap.content_hash) not in _provider_mixes]
+    if todo:
+        rows = list(session.execute(
+            select(ProviderHolding.snapshot_id, ProviderHolding.ticker, ProviderHolding.weight)
+            .where(ProviderHolding.snapshot_id.in_([snap.id for snap in todo]),
+                   ProviderHolding.weight > 0)))
+        sectors = _ticker_sectors(session, {r.ticker for r in rows})
+        raw: dict[int, dict[str, float]] = {snap.id: {} for snap in todo}
+        for r in rows:
+            sector = sectors.get(r.ticker, UNCLASSIFIED)
+            raw[r.snapshot_id][sector] = raw[r.snapshot_id].get(sector, 0.0) + r.weight
+        for snap in todo:
+            mix = raw[snap.id]
+            total = sum(mix.values())
+            _provider_mixes[(snap.id, snap.content_hash)] = {k: v / total for k, v in mix.items()} if total > 0 else {}
+    funds = {f.ticker: f for f in session.scalars(select(Fund).where(Fund.ticker.in_(sorted(newer))))}
+    return {t: (funds[t], snap.as_of_date, _provider_mixes[(snap.id, snap.content_hash)], "tickerinside",
+                snap.source_layer)
+            for t, snap in newer.items() if _provider_mixes.get((snap.id, snap.content_hash)) and t in funds}
 
 
 def sector_list(mix: dict[str, float]) -> list[dict]:
@@ -170,8 +248,9 @@ def covered_etfs(session: Session = Depends(get_session),
     """The allowlisted ETFs (and local sample funds) with holdings data, and their sector mixes."""
     return [
         {"ticker": ticker, "name": fund.name, "issuer": fund.issuer, "as_of_date": as_of,
+         "source_provider": provider, "source_layer": layer,
          "sample": fund.issuer == SAMPLE_ISSUER, "sectors": sector_list(mix)}
-        for ticker, (fund, as_of, mix) in sorted(
+        for ticker, (fund, as_of, mix, provider, layer) in sorted(
             load_universe(session, (), allow, include_samples=True).items())
     ]
 
@@ -185,7 +264,7 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
         ticker = h.ticker.strip().upper()
         amounts[ticker] = amounts.get(ticker, 0.0) + h.amount
     universe = load_universe(session, amounts, allow)
-    weights = {t: mix for t, (_, _, mix) in universe.items()}
+    weights = {t: entry[2] for t, entry in universe.items()}
     names = {f.ticker: f for f in session.scalars(select(Fund).where(Fund.ticker.in_(list(amounts))))}
     unknown = [t for t in amounts if t not in names]
     if unknown:
@@ -209,7 +288,7 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
     plans = []
     if target is not None:
         # Held ETFs of any kind count; new ones come only from the allowlist, never sample funds.
-        samples = {t for t, (fund, _, _) in universe.items() if fund.issuer == SAMPLE_ISSUER}
+        samples = {t for t, entry in universe.items() if entry[0].issuer == SAMPLE_ISSUER}
         never = set(weights) - (suggestable(weights, allow) - samples)
         for p in build_plans(amounts, weights, target, body.cash_change, body.max_new_funds, never):
             plans.append({
@@ -227,6 +306,8 @@ def plan(body: PlanIn, session: Session = Depends(get_session),
             {"ticker": t, "name": fund_name(t), "issuer": names[t].issuer, "amount": a,
              "status": "available" if t in universe else "missing",
              "as_of_date": universe[t][1] if t in universe else None,
+             "source_provider": universe[t][3] if t in universe else None,
+             "source_layer": universe[t][4] if t in universe else None,
              "sectors": sector_list(universe[t][2]) if t in universe else []}
             for t, a in amounts.items()
         ],

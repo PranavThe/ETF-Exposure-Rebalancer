@@ -10,6 +10,8 @@ export type CoveredEtf = {
   name: string;
   issuer: string;
   as_of_date: string;
+  source_provider: string;
+  source_layer: string | null;
   sample: boolean;
   sectors: SectorWeight[];
 };
@@ -21,6 +23,8 @@ export type PlanFund = {
   amount: number;
   status: "available" | "missing";
   as_of_date: string | null;
+  source_provider: string | null;
+  source_layer: string | null;
   sectors: SectorWeight[];
 };
 

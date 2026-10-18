@@ -47,6 +47,19 @@ def read_name_sectors() -> dict[str, str]:
             if r["normalized_name"] and r["sector"]}
 
 
+def read_ticker_sectors() -> dict[str, str]:
+    """Stock ticker (letters and digits only, upper case) -> sector, from name_sectors.csv."""
+    if not (REFERENCE_DIR / "name_sectors.csv").exists():
+        return {}
+    return {normalize_symbol(r["ticker"]): r["sector"] for r in _read("name_sectors.csv")
+            if r.get("ticker") and r["sector"]}
+
+
+def normalize_symbol(ticker: str) -> str:
+    """'BRK.B', 'BRK/B' and 'brkb' all become 'BRKB'."""
+    return "".join(c for c in ticker.upper() if c.isalnum())
+
+
 def sync_reference(session: Session, *, include_samples: bool = False) -> None:
     """Upsert production references and optionally local fixture references."""
     existing = {f.ticker: f for f in session.scalars(select(Fund))}
