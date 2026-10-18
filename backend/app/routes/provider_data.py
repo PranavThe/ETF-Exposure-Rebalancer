@@ -5,7 +5,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import ProviderHolding, ProviderHoldingsSnapshot, SecurityPrice
+from ..models import Fund, ProviderHolding, ProviderHoldingsSnapshot, SecurityPrice, Snapshot
+from backend.pipeline.tickerinside import ProviderError, ProviderNotCovered, fetch_fund, save_fund
 
 router = APIRouter(prefix="/provider-data")
 
@@ -13,6 +14,49 @@ router = APIRouter(prefix="/provider-data")
 def _rows(session: Session, snapshot_id: int) -> dict[str, float]:
     return dict(session.execute(select(ProviderHolding.ticker, ProviderHolding.weight)
                                 .where(ProviderHolding.snapshot_id == snapshot_id)).all())
+
+
+@router.post("/funds/{ticker}/sync")
+def sync_tickerinside_fund(ticker: str, session: Session = Depends(get_session)):
+    """Fetch a fund's TickerInside holdings on first use and persist them in Neon."""
+    ticker = ticker.strip().upper()
+    fund = session.scalar(select(Fund).where(Fund.ticker == ticker))
+    if fund is None:
+        raise HTTPException(404, f"unknown fund {ticker}")
+
+    existing = session.scalar(
+        select(ProviderHoldingsSnapshot)
+        .where(ProviderHoldingsSnapshot.provider == "tickerinside",
+               ProviderHoldingsSnapshot.fund_ticker == ticker)
+        .order_by(ProviderHoldingsSnapshot.as_of_date.desc(),
+                  ProviderHoldingsSnapshot.fetched_at.desc())
+        .limit(1)
+    )
+    if existing is not None:
+        count = session.scalar(select(func.count(ProviderHolding.id)).where(
+            ProviderHolding.snapshot_id == existing.id)) or 0
+        return {"fund": ticker, "status": "already_available",
+                "as_of_date": existing.as_of_date, "holdings_count": count}
+
+    try:
+        data = fetch_fund(ticker, timeout=8)
+    except ProviderNotCovered:
+        sec_snapshot = session.scalar(select(Snapshot.id).where(
+            Snapshot.fund_id == fund.id).limit(1))
+        return {"fund": ticker, "status": "not_covered",
+                "fallback_available": sec_snapshot is not None}
+    except ProviderError:
+        sec_snapshot = session.scalar(select(Snapshot.id).where(
+            Snapshot.fund_id == fund.id).limit(1))
+        return {"fund": ticker, "status": "unavailable",
+                "fallback_available": sec_snapshot is not None}
+
+    snapshot, _ = save_fund(session, data)
+    session.commit()
+    count = session.scalar(select(func.count(ProviderHolding.id)).where(
+        ProviderHolding.snapshot_id == snapshot.id)) or 0
+    return {"fund": ticker, "status": "fetched", "as_of_date": snapshot.as_of_date,
+            "holdings_count": count}
 
 
 @router.get("/funds/{ticker}/holdings")

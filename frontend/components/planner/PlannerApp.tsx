@@ -67,6 +67,7 @@ export default function PlannerApp() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [flash, setFlash] = useState<Set<string>>(new Set());
   const [focusKey, setFocusKey] = useState(0);
+  const [planRefresh, setPlanRefresh] = useState(0);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [providerData, setProviderData] = useState<Map<string, ProviderHoldingChanges>>(() => new Map());
   const [prices, setPrices] = useState<Map<string, ProviderPrice>>(() => new Map());
@@ -141,7 +142,7 @@ export default function PlannerApp() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [request, ready]);
+  }, [request, ready, planRefresh]);
 
   // For ETFs whose mix comes from TickerInside, fetch their top holdings and latest IEX prices.
   const providerTickers = useMemo(() => {
@@ -172,11 +173,12 @@ export default function PlannerApp() {
       dirty.current = false; // edits made while saving set it again
       setSaveState("saving");
       savePortfolio(saved, holdings, target).then(
-        (place) => {
+        ({ place, addedFunds }) => {
           savedId.current = place.id;
           setSaved(place);
           setUrl(place.id);
           setSaveState("saved");
+          if (addedFunds) setPlanRefresh((version) => version + 1);
         },
         () => {
           dirty.current = true;
