@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
 
 import { FrameDivider } from "./Frame";
@@ -41,8 +42,12 @@ export default function SiteFooter() {
       <FrameDivider />
       <div className="grid grid-cols-1 gap-10 px-5 pt-14 sm:px-8 md:grid-cols-[minmax(0,1fr)_auto] lg:px-14">
         <div className="max-w-[420px]">
-          <Link href="/" className="text-[19px] font-semibold tracking-tight text-fg">
-            {BRAND}
+          <Link
+            href="/"
+            className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            aria-label={`${BRAND} home`}
+          >
+            <BrandLogo width={168} />
           </Link>
           <p className="mt-4 text-[14px] leading-relaxed text-muted">{DISCLAIMER}</p>
         </div>

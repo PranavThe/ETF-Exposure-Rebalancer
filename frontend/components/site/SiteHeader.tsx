@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import BrandLogo from "@/components/BrandLogo";
 import { BRAND } from "@/lib/brand";
 
 import { FrameDivider, PlusIcon } from "./Frame";
@@ -25,8 +26,12 @@ export default function SiteHeader() {
         className="absolute inset-y-0 -inset-x-[6px] -z-10 bg-[linear-gradient(to_right,var(--color-canvas)_5px,var(--color-line)_5px,var(--color-line)_6px,var(--color-canvas)_6px,var(--color-canvas)_calc(100%_-_6px),var(--color-line)_calc(100%_-_6px),var(--color-line)_calc(100%_-_5px),var(--color-canvas)_calc(100%_-_5px))]"
       />
       <div className="flex h-16 items-center justify-between px-5 sm:px-8">
-        <Link href="/" className="text-[19px] font-semibold tracking-tight text-fg" aria-label={`${BRAND} home`}>
-          {BRAND}
+        <Link
+          href="/"
+          className="inline-flex shrink-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          aria-label={`${BRAND} home`}
+        >
+          <BrandLogo loading="eager" />
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-10 md:flex">
