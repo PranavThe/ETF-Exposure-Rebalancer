@@ -48,8 +48,7 @@ DEMO, SPLT and FLOWTEST fixtures, which the app never suggests.
 
 ## Frontend
 
-A dark, terminal-style Next.js app (modelled on the Kairos terminal) plus a marketing site (modelled
-on kairos.trade) in the same project:
+A dark, terminal-style Next.js app plus a marketing site in the same project:
 
 | Route | What it shows |
 |---|---|

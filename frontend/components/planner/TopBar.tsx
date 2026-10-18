@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import BrandLogo from "@/components/BrandLogo";
 import type { Fund } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import { pct } from "@/lib/format";
 import { planner, sectorColor, type CoveredEtf } from "@/lib/planner";
 
-import { BrandMark, Monogram } from "./ui";
+import { Monogram } from "./ui";
 
 type Option = { ticker: string; name: string; covered?: CoveredEtf; hasData: boolean };
 
@@ -217,9 +218,12 @@ export default function TopBar({
 
   return (
     <header className="relative z-30 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas/80 px-3 backdrop-blur sm:gap-5 sm:px-5">
-      <Link href="/" className="flex shrink-0 items-center gap-2 text-fg">
-        <BrandMark />
-        <span className="text-[19px] font-semibold tracking-tight">{BRAND}</span>
+      <Link
+        href="/"
+        className="inline-flex shrink-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        aria-label={`${BRAND} home`}
+      >
+        <BrandLogo width={132} loading="eager" />
       </Link>
       <nav className="hidden items-center gap-5 text-[15px] lg:flex">
         <span className="text-accent">Planner</span>
