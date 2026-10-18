@@ -4,19 +4,85 @@ import { useState } from "react";
 
 import type { ProviderHoldingChanges, ProviderPrice } from "@/lib/api";
 import { pct } from "@/lib/format";
-import { SECTORS, UNCLASSIFIED, sectorColor, toMix, usd, type CoveredEtf, type Holding, type PlanFund } from "@/lib/planner";
+import {
+  SECTORS,
+  UNCLASSIFIED,
+  modelLabel,
+  planner,
+  sectorColor,
+  toMix,
+  usd,
+  type CoveredEtf,
+  type EtfExplanation,
+  type Holding,
+  type PlanFund,
+} from "@/lib/planner";
 
 import AmountInput from "./AmountInput";
 import { EtfSearch } from "./TopBar";
-import { AnimatedNumber, Monogram, ScytheMark } from "./ui";
+import { AnimatedNumber, Monogram, ScytheMark, Skeleton, Sparkle } from "./ui";
+
+// Explanations already fetched this visit, so reopening a fund shows its answer at once.
+const explained = new Map<string, EtfExplanation>();
+
+/** Gemini's short description of what a fund holds, on request. */
+function WhatsInside({ ticker }: { ticker: string }) {
+  const [state, setState] = useState<{ data?: EtfExplanation; error?: string; loading?: boolean }>(() =>
+    explained.has(ticker) ? { data: explained.get(ticker) } : {},
+  );
+  if (!state.data && !state.loading && !state.error) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setState({ loading: true });
+          planner.explainEtf(ticker).then(
+            (data) => {
+              explained.set(ticker, data);
+              setState({ data });
+            },
+            (err: Error) => setState({ error: err.message }),
+          );
+        }}
+        className="group inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-[12px] text-fg/90 transition-all hover:border-accent-strong/60 hover:bg-accent-strong/10 active:scale-[0.97]"
+      >
+        <Sparkle size={12} className="text-accent transition-transform duration-300 group-hover:rotate-90" /> What&apos;s inside?
+      </button>
+    );
+  }
+  if (state.loading) {
+    return (
+      <div className="space-y-1.5">
+        <Skeleton className="h-3.5 w-full" />
+        <Skeleton className="h-3.5 w-4/5" />
+      </div>
+    );
+  }
+  if (state.error) return <p className="text-down">{state.error}</p>;
+  const data = state.data!;
+  return (
+    <div className="animate-fade-up space-y-1.5 rounded-md border border-line/70 bg-canvas/40 p-2.5">
+      <p className="leading-relaxed text-fg/90">{data.summary}</p>
+      <ul className="list-disc space-y-0.5 pl-4 text-muted marker:text-faint">
+        {data.points.map((point) => (
+          <li key={point}>{point}</li>
+        ))}
+      </ul>
+      <p className="flex items-center gap-1 text-[10.5px] text-faint">
+        <Sparkle size={10} />
+        {data.source === "gemini" ? `${modelLabel(data.model)}, from this fund's holdings` : "From this fund's holdings (Gemini unavailable)"}
+      </p>
+    </div>
+  );
+}
 
 const SOURCE: Record<string, string> = { sec: "SEC filing", issuer: "Issuer file", tickerinside: "TickerInside" };
 
 /** What's behind one holding: where the data came from, its sectors and its largest positions. */
-function Details({ fund, provider, prices, onRemove }: { fund?: PlanFund; provider?: ProviderHoldingChanges; prices: Map<string, ProviderPrice>; onRemove: () => void }) {
+function Details({ fund, amount, provider, prices, onRemove }: { fund?: PlanFund; amount: number; provider?: ProviderHoldingChanges; prices: Map<string, ProviderPrice>; onRemove: () => void }) {
   const mix = toMix(fund?.sectors);
   return (
-    <div className="mt-3 animate-fade-in space-y-3 pl-[44px] text-[12px]">
+    <div className="space-y-3 pt-3 pl-[44px] text-[12px]">
       {fund?.status === "missing" ? (
         <p className="leading-relaxed text-faint">Its holdings aren’t loaded yet, so it stays out of your mix and the moves.</p>
       ) : fund ? (
@@ -37,7 +103,21 @@ function Details({ fund, provider, prices, onRemove }: { fund?: PlanFund; provid
             {SOURCE[fund.source_provider ?? ""] ?? "Holdings"}
             {fund.source_layer ? ` · ${fund.source_layer}` : ""} · as of {fund.as_of_date}
           </p>
+          <WhatsInside ticker={fund.ticker} />
         </>
+      ) : null}
+      {fund?.fee ? (
+        <p className="text-faint">
+          Yearly fee <span className="font-mono text-fg/90">{(fund.fee.expense_ratio * 100).toFixed(2)}%</span>
+          {amount > 0 && <> · about <span className="font-mono text-fg/90">{usd(fund.fee.expense_ratio * amount, amount * fund.fee.expense_ratio < 10)}</span> a year on {usd(amount)}</>}
+          {" · "}
+          <a href={fund.fee.source_url} target="_blank" rel="noreferrer" className="underline decoration-line-2 underline-offset-2 transition-colors hover:text-fg">
+            {fund.fee.source_url.includes("sec.gov") ? "SEC filing" : "source"}
+            {fund.fee.as_of ? ` ${fund.fee.as_of}` : ""}
+          </a>
+        </p>
+      ) : fund ? (
+        <p className="text-faint">Yearly fee not on file.</p>
       ) : null}
       {provider && (
         <div>
@@ -94,6 +174,12 @@ export default function HoldingsSection({
   logo?: (ticker: string, name: string) => React.ReactNode;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  // Rows opened at least once keep their details mounted, so closing can animate too.
+  const [seen, setSeen] = useState<Set<string>>(() => new Set());
+  const toggle = (ticker: string) => {
+    setOpen(open === ticker ? null : ticker);
+    setSeen((s) => (s.has(ticker) ? s : new Set(s).add(ticker)));
+  };
   const total = holdings.reduce((a, h) => a + h.amount, 0);
 
   return (
@@ -126,7 +212,7 @@ export default function HoldingsSection({
               <button
                 type="button"
                 onClick={onExample}
-                className="rounded-md bg-accent-strong px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-accent hover:text-canvas active:scale-[0.98]"
+                className="rounded-md bg-accent-strong px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-accent hover:text-canvas active:scale-[0.98] hover:shadow-[0_0_0_4px_rgba(122,115,240,0.18)]"
               >
                 Try an example portfolio
               </button>
@@ -147,11 +233,11 @@ export default function HoldingsSection({
               const share = total > 0 ? h.amount / total : 0;
               const expanded = open === h.ticker;
               return (
-                <li key={h.ticker} className={`border-b border-line/70 px-6 py-3.5 transition-colors ${expanded ? "bg-panel/50" : ""} ${flash.has(h.ticker) ? "flash" : ""}`}>
+                <li key={h.ticker} className={`border-b border-line/70 px-6 py-3.5 transition-colors duration-200 ${expanded ? "bg-panel/50" : "hover:bg-panel/30"} ${flash.has(h.ticker) ? "flash" : ""}`}>
                   <div className="flex items-start gap-3">
                     <button
                       type="button"
-                      onClick={() => setOpen(expanded ? null : h.ticker)}
+                      onClick={() => toggle(h.ticker)}
                       aria-expanded={expanded}
                       aria-label={`${expanded ? "Hide" : "Show"} details for ${h.ticker}`}
                       className="mt-0.5 shrink-0"
@@ -162,7 +248,7 @@ export default function HoldingsSection({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setOpen(expanded ? null : h.ticker)}
+                          onClick={() => toggle(h.ticker)}
                           className="flex min-w-0 items-center gap-1.5 text-left"
                           tabIndex={-1}
                         >
@@ -185,7 +271,13 @@ export default function HoldingsSection({
                       </div>
                     </div>
                   </div>
-                  {expanded && <Details fund={fund} provider={providerData.get(h.ticker)} prices={prices} onRemove={() => onRemove(h.ticker)} />}
+                  <div className="disclose" data-open={expanded} inert={!expanded}>
+                    <div>
+                      {seen.has(h.ticker) && (
+                        <Details fund={fund} amount={h.amount} provider={providerData.get(h.ticker)} prices={prices} onRemove={() => onRemove(h.ticker)} />
+                      )}
+                    </div>
+                  </div>
                 </li>
               );
             })}

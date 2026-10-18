@@ -62,7 +62,7 @@ export default function PortfolioTabs({
                 const dragged = event.dataTransfer.getData("text/plain");
                 if (dragged && dragged !== tab.id) onMove(dragged, tab.id);
               }}
-              className={`group flex h-8 shrink-0 items-center rounded-md border transition-colors ${
+              className={`group flex h-8 shrink-0 items-center rounded-md border transition-all duration-200 ${
                 active ? "border-line-2 bg-panel text-fg" : "border-transparent text-muted hover:bg-panel/70 hover:text-fg"
               }`}
             >
@@ -85,7 +85,7 @@ export default function PortfolioTabs({
                       setEditing(null);
                     }
                   }}
-                  className="w-32 bg-transparent px-2 text-xs outline-none"
+                  className="w-36 rounded-[5px] bg-canvas px-2 py-1 text-xs text-fg outline-none ring-1 ring-accent-strong/70"
                 />
               ) : (
                 <button
@@ -118,9 +118,12 @@ export default function PortfolioTabs({
                   title="Rename portfolio (shared portfolios are copied first)"
                   disabled={disabled}
                   onClick={() => beginRename(tab)}
-                  className="px-1 text-[11px] text-faint hover:text-fg disabled:cursor-wait"
+                  className={`flex h-5 w-5 items-center justify-center rounded text-faint transition-all hover:bg-panel-3 hover:text-fg focus-visible:opacity-100 disabled:cursor-wait ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                 >
-                  ✎
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                    <path d="M4 20h4L19 9l-4-4L4 16v4Z" />
+                    <path d="m13.5 6.5 4 4" />
+                  </svg>
                 </button>
               )}
               <button
@@ -129,9 +132,11 @@ export default function PortfolioTabs({
                 title="Close tab (saved portfolio is kept)"
                 disabled={disabled}
                 onClick={() => onClose(tab.id)}
-                className="mr-1 flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-panel-3 hover:text-fg disabled:cursor-wait"
+                className="mr-1 flex h-5 w-5 items-center justify-center rounded text-faint transition-colors hover:bg-panel-3 hover:text-fg disabled:cursor-wait"
               >
-                ×
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden>
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
               </button>
             </div>
           );

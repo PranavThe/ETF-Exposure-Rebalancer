@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { pct, pp } from "@/lib/format";
-import { SECTORS, UNCLASSIFIED, sectorColor, toMix, usd, type Mix, type PlanFund } from "@/lib/planner";
+import { SECTORS, UNCLASSIFIED, sectorColor, toMix, usd, type Companies, type Mix, type PlanFund } from "@/lib/planner";
 
+import CompaniesView from "./CompaniesView";
 import { AnimatedNumber, SectionHeader, TextTabs } from "./ui";
 
 const SIZE = 216;
@@ -13,6 +14,16 @@ const SHOWN_BY_DEFAULT = 0.005; // sectors under 0.5% now and in the target fold
 
 /** One ring of the donut: a circle per sector, drawn with dash offsets so changes glide. */
 function Ring({ mix, r, width, hover, onHover, dim = false }: { mix: Mix; r: number; width: number; hover: string | null; onHover: (s: string | null) => void; dim?: boolean }) {
+  // Arcs start empty and sweep out on first paint; after that they glide between mixes.
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => (inner = requestAnimationFrame(() => setDrawn(true))));
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, []);
   const circ = 2 * Math.PI * r;
   const order = [...SECTORS, UNCLASSIFIED];
   const total = order.reduce((a, s) => a + (mix[s] ?? 0), 0) || 1;
@@ -22,7 +33,7 @@ function Ring({ mix, r, width, hover, onHover, dim = false }: { mix: Mix; r: num
       <circle cx={C} cy={C} r={r} fill="none" stroke="var(--color-panel-3)" strokeWidth={width} opacity={0.5} />
       {order.map((s) => {
         const frac = (mix[s] ?? 0) / total;
-        const len = Math.max(0, frac * circ - (frac > 0.004 ? 2 : 0));
+        const len = drawn ? Math.max(0, frac * circ - (frac > 0.004 ? 2 : 0)) : 0;
         const seg = (
           <circle
             key={s}
@@ -55,7 +66,8 @@ function Donut({ current, target, hover, onHover, match }: { current: Mix; targe
   const want = hover && target ? target[hover] ?? 0 : null;
   return (
     <div className="relative aspect-square w-[176px] shrink-0 @[60rem]:w-[216px]">
-      <svg width="100%" height="100%" viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Sector mix: inner ring now, outer ring your target">
+      <div aria-hidden className="pointer-events-none absolute inset-[18%] rounded-full bg-accent-strong/10 blur-2xl" />
+      <svg width="100%" height="100%" viewBox={`0 0 ${SIZE} ${SIZE}`} className="relative" role="img" aria-label="Sector mix: inner ring now, outer ring your target">
         {empty ? (
           <>
             <circle cx={C} cy={C} r={96} fill="none" stroke="var(--color-panel-3)" strokeWidth={8} opacity={0.6} />
@@ -104,6 +116,8 @@ export default function MixSection({
   match,
   matchAfter,
   funds,
+  companies,
+  companiesLoading,
   hasHoldings,
   onSector,
   onReset,
@@ -113,6 +127,8 @@ export default function MixSection({
   match: number | null;
   matchAfter: number | null;
   funds: PlanFund[];
+  companies: Companies | null;
+  companiesLoading: boolean;
   hasHoldings: boolean;
   onSector: (sector: string, value: number) => void;
   onReset: () => void;
@@ -150,6 +166,7 @@ export default function MixSection({
               onTab={setView}
               tabs={[
                 { id: "sectors", label: "Sectors" },
+                { id: "companies", label: "Companies" },
                 { id: "etfs", label: "By ETF" },
               ]}
             />
@@ -240,6 +257,8 @@ export default function MixSection({
               </div>
             </div>
           </div>
+        ) : view === "companies" ? (
+          <CompaniesView data={companies} loading={companiesLoading} />
         ) : funds.length === 0 ? (
           <p className="py-16 text-center text-sm text-muted">Add ETFs to see what each one holds.</p>
         ) : (

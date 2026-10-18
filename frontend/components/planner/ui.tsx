@@ -63,6 +63,16 @@ export function Monogram({ ticker, size = 28 }: { ticker: string; size?: number 
   );
 }
 
+/** A four-point spark, used wherever Gemini wrote or read something. */
+export function Sparkle({ className = "", size = 13 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden className={`shrink-0 ${className}`}>
+      <path d="M12 2c.5 4.9 3.1 7.5 8 8-4.9.5-7.5 3.1-8 8-.5-4.9-3.1-7.5-8-8 4.9-.5 7.5-3.1 8-8Z" />
+      <path d="M19 15c.2 1.9 1.1 2.8 3 3-1.9.2-2.8 1.1-3 3-.2-1.9-1.1-2.8-3-3 1.9-.2 2.8-1.1 3-3Z" opacity=".6" />
+    </svg>
+  );
+}
+
 export type Tab = { id: string; label: React.ReactNode; badge?: React.ReactNode };
 
 export function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (v: number) => void; label: string }) {
@@ -108,8 +118,20 @@ export function Skeleton({ className = "" }: { className?: string }) {
 
 /** Underlined text tabs for section headers (no boxes). */
 export function TextTabs({ tabs, active, onTab, label }: { tabs: Tab[]; active: string; onTab: (id: string) => void; label: string }) {
+  const list = useRef<HTMLDivElement>(null);
+  const [ink, setInk] = useState<{ x: number; w: number } | null>(null);
+  // The underline is one element that glides to the selected tab, measured after layout.
+  useEffect(() => {
+    const el = list.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!el) return;
+    const place = () => setInk({ x: el.offsetLeft, w: el.offsetWidth });
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [active, tabs.length]);
   return (
-    <div role="tablist" aria-label={label} className="-mb-px flex items-center gap-5 overflow-x-auto [scrollbar-width:none]">
+    <div ref={list} role="tablist" aria-label={label} className="relative -mb-px flex items-center gap-5 overflow-x-auto [scrollbar-width:none]">
       {tabs.map((t) => {
         const on = t.id === active;
         return (
@@ -123,13 +145,16 @@ export function TextTabs({ tabs, active, onTab, label }: { tabs: Tab[]; active: 
           >
             {t.label}
             {t.badge !== undefined && <span className={`font-mono text-[12px] ${on ? "text-up" : "text-faint"}`}>{t.badge}</span>}
-            <span
-              aria-hidden
-              className={`absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent transition-opacity duration-200 ${on ? "opacity-100" : "opacity-0"}`}
-            />
           </button>
         );
       })}
+      {ink && (
+        <span
+          aria-hidden
+          className="tab-ink pointer-events-none absolute bottom-0 left-0 h-[2px] rounded-full bg-accent"
+          style={{ width: ink.w, transform: `translateX(${ink.x}px)` }}
+        />
+      )}
     </div>
   );
 }

@@ -4,6 +4,8 @@
 import { API_URL, api, type Fund } from "@/lib/api";
 
 export type SectorWeight = { sector: string; weight: number };
+/** A fund's yearly fee (a fraction: 0.0003 = 0.03%) and the SEC filing it comes from. */
+export type FundFee = { expense_ratio: number; as_of: string | null; source_url: string };
 
 export type CoveredEtf = {
   ticker: string;
@@ -13,6 +15,7 @@ export type CoveredEtf = {
   source_provider: string;
   source_layer: string | null;
   sample: boolean;
+  fee?: FundFee | null;
   sectors: SectorWeight[];
 };
 
@@ -25,6 +28,7 @@ export type PlanFund = {
   as_of_date: string | null;
   source_provider: string | null;
   source_layer: string | null;
+  fee?: FundFee | null;
   sectors: SectorWeight[];
 };
 
@@ -41,6 +45,9 @@ export type Plan = {
   exposure: SectorWeight[];
   moves: Move[];
   new_funds: string[];
+  fee_before: number; // dollars a year in fund fees, for funds whose fee is known
+  fee_after: number;
+  fee_known_after: number;
 };
 
 export type PlanResult = {
@@ -50,8 +57,33 @@ export type PlanResult = {
   current: SectorWeight[];
   target: SectorWeight[] | null;
   distance: number | null;
+  yearly_fee: number;
+  fee_known: number;
   plans: Plan[];
 };
+
+export type Company = {
+  name: string;
+  ticker: string | null;
+  amount: number;
+  share: number;
+  funds: { ticker: string; amount: number }[];
+};
+export type Companies = {
+  covered_total: number;
+  companies: Company[];
+  top10_share: number;
+  overlaps: { a: string; b: string; overlap: number }[];
+};
+
+export type PlanExplanation = {
+  summary: string;
+  moves: { ticker: string; why: string }[];
+  consider: string[];
+  source: "gemini" | "rules";
+  model?: string | null;
+};
+export type EtfExplanation = { summary: string; points: string[]; source: "gemini" | "rules"; model?: string | null };
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type ChatReply = {
@@ -179,7 +211,19 @@ export const planner = {
     call<PlanResult>("/plan", { method: "POST", body: JSON.stringify(body), signal }),
   chat: (body: { message: string; history: ChatTurn[]; current: Mix; target: Mix | null; total: number }, signal?: AbortSignal) =>
     call<ChatReply>("/chat", { method: "POST", body: JSON.stringify(body), signal }),
+  companies: (holdings: { ticker: string; amount: number }[], signal?: AbortSignal) =>
+    call<Companies>("/exposure/companies", { method: "POST", body: JSON.stringify({ holdings }), signal }),
+  explainPlan: (body: PlanRequest & { kind: string }, signal?: AbortSignal) =>
+    call<PlanExplanation>("/explain/plan", { method: "POST", body: JSON.stringify(body), signal }),
+  explainEtf: (ticker: string, signal?: AbortSignal) =>
+    call<EtfExplanation>("/explain/etf", { method: "POST", body: JSON.stringify({ ticker }), signal }),
 };
+
+/** "Gemini 3.5 Flash Lite" from "gemini-3.5-flash-lite". */
+export function modelLabel(model: string | null | undefined): string {
+  if (!model) return "Gemini";
+  return model.split("-").map((w) => (/^\d/.test(w) ? w : w[0].toUpperCase() + w.slice(1))).join(" ");
+}
 
 // ---- Saving: an anonymous portfolio (weights) plus its dollar value and target ---------------
 

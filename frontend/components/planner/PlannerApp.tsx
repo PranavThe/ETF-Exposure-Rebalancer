@@ -19,6 +19,7 @@ import {
   targetFrom,
   toMix,
   type ChatTurn,
+  type Companies,
   type CoveredEtf,
   type Holding,
   type Mix,
@@ -62,6 +63,8 @@ export default function PlannerApp() {
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [maxNew, setMaxNew] = useState(2);
   const [result, setResult] = useState<PlanResult | null>(null);
+  const [companies, setCompanies] = useState<Companies | null>(null);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [planning, setPlanning] = useState(false);
   const [activePlan, setActivePlan] = useState(0);
@@ -168,6 +171,35 @@ export default function PlannerApp() {
       controller.abort();
     };
   }, [request, ready, planRefresh]);
+
+  // The companies inside the ETFs: only the holdings matter, so the target and sliders don't refetch.
+  const holdingsKey = JSON.stringify(request.holdings);
+  useEffect(() => {
+    if (!ready) return;
+    if (request.holdings.length === 0) {
+      setCompanies(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setCompaniesLoading(true);
+      planner.companies(JSON.parse(holdingsKey), controller.signal).then(
+        (c) => {
+          if (controller.signal.aborted) return;
+          setCompanies(c);
+          setCompaniesLoading(false);
+        },
+        () => {
+          if (!controller.signal.aborted) setCompaniesLoading(false);
+        },
+      );
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdingsKey, ready, planRefresh]);
 
   // For ETFs whose mix comes from TickerInside, fetch their top holdings and latest IEX prices.
   const providerTickers = useMemo(() => {
@@ -576,6 +608,11 @@ export default function PlannerApp() {
   const match = distance === null ? null : 1 - distance;
   const best = plans.length ? plans.reduce((a, b) => (b.distance < a.distance ? b : a)) : null;
   const held = useMemo(() => new Set(holdings.map((h) => h.ticker)), [holdings]);
+  const dataDates = useMemo(() => {
+    const dates = (result?.funds ?? []).map((f) => f.as_of_date).filter((d): d is string => Boolean(d)).sort();
+    if (dates.length === 0) return null;
+    return dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} to ${dates[dates.length - 1]}`;
+  }, [result]);
 
   return (
     <div className="relative mx-auto flex h-dvh w-full max-w-[1920px] flex-col bg-canvas min-[1922px]:border-x min-[1922px]:border-line">
@@ -626,6 +663,8 @@ export default function PlannerApp() {
                 match={match}
                 matchAfter={best ? 1 - best.distance : null}
                 funds={result?.funds ?? []}
+                companies={companies}
+                companiesLoading={companiesLoading}
                 hasHoldings={hasHoldings}
                 onSector={moveSlider}
                 onReset={resetTarget}
@@ -643,6 +682,8 @@ export default function PlannerApp() {
                 maxNew={maxNew}
                 onMaxNew={setMaxNew}
                 onApply={applyPlan}
+                request={request}
+                dataDates={dataDates}
               />
             </div>
           </div>
