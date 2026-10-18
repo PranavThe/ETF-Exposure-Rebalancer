@@ -11,8 +11,6 @@ def default_adapter_for(fund: str) -> str:
     ticker = fund.upper()
     if ticker == "ARKK":
         return "ark"
-    if ticker in {"DEMO", "SPLT", "FLOWTEST"}:
-        return "sample"
     raise ValueError(f"No default holdings adapter for {ticker}; choose one explicitly")
 
 

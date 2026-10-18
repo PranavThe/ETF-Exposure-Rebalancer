@@ -2,9 +2,11 @@ import csv
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 REPO = Path(__file__).resolve().parents[2]
-SAMPLE_DIR = REPO / "data" / "sample"
+SAMPLE_DIR = REPO / "backend" / "tests" / "fixtures"
 REFERENCE_DIR = REPO / "data" / "reference"
 
 
@@ -53,6 +55,24 @@ def db_url(tmp_path, monkeypatch):
 
 def ingest(path: Path, fund: str, *extra: str) -> int:
     """Run the pipeline CLI in-process and return its exit code."""
+    if fund in {"DEMO", "SPLT", "FLOWTEST"}:
+        from backend.app.db import get_engine, init_db
+        from backend.app.models import Fund, SecuritySector
+
+        init_db()
+        with Session(get_engine()) as session, session.begin():
+            with (SAMPLE_DIR / "funds.csv").open(newline="") as source:
+                for row in csv.DictReader(source):
+                    if not session.scalar(select(Fund.id).where(Fund.ticker == row["ticker"])):
+                        session.add(Fund(**row))
+            with (SAMPLE_DIR / "sectors.csv").open(newline="") as source:
+                for row in csv.DictReader(source):
+                    if not session.scalar(select(SecuritySector.security_id).where(
+                        SecuritySector.security_id == row["security_id"]
+                    )):
+                        session.add(SecuritySector(**row))
+    if fund != "ARKK" and "--adapter" not in extra:
+        extra = (*extra, "--adapter", "sample")
     from backend.pipeline.run import main
 
     return main(["--fund", fund, "--file", str(path), *extra])

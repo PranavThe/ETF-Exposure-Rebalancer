@@ -1,4 +1,4 @@
-"""Ingest one holdings file: python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.csv"""
+"""Ingest one issuer holdings file: python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_2026-10-16.csv"""
 
 import sys
 from pathlib import Path

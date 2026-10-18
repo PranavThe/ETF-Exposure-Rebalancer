@@ -31,7 +31,7 @@ class PipelineResult:
 
 
 def run_pipeline(fund: str, file: str | Path, adapter: str | None = None, replace: bool = False,
-                 source_url: str | None = None, include_samples: bool | None = None) -> PipelineResult:
+                 source_url: str | None = None) -> PipelineResult:
     fund = fund.strip().upper()
     path = Path(file)
     source_file = path.as_posix()
@@ -43,8 +43,7 @@ def run_pipeline(fund: str, file: str | Path, adapter: str | None = None, replac
 
     engine = get_engine()
     with Session(engine) as session, session.begin():
-        sync_reference(session, include_samples=(reader.name == "sample") if include_samples is None
-                       else include_samples)
+        sync_reference(session)
 
     rows: list[Row] = []
     try:
@@ -91,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fund", required=True, help="fund ticker, e.g. ARKK")
     parser.add_argument("--file", required=True, help="path to the holdings file")
     parser.add_argument("--adapter", choices=sorted(ADAPTERS),
-                        help="file format (default: ark for ARKK; sample for local fixture tickers only)")
+                        help="file format (default: ark for ARKK; sample for test fixtures only)")
     parser.add_argument("--replace", action="store_true",
                         help="overwrite a stored snapshot for the same fund and date")
     parser.add_argument("--source-url", help="where the file came from (default: the adapter's URL)")

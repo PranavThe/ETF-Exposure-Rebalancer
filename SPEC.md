@@ -55,9 +55,8 @@ whole-share order sizing. Adding new infrastructure requires the working-contrac
 - **Frontend:** Next.js App Router, React, TypeScript, Tailwind CSS and Recharts. Versions are
   declared in `frontend/package.json` and locked in its lockfile. Node.js must meet Next.js's minimum
   (20.9+) locally. The frontend reads `NEXT_PUBLIC_API_URL`, defaulting to `http://localhost:8000`.
-- **Local commands:** `make setup`, `make api`, `make web`, `make test`, `make ingest-sample`,
-  `make ingest-raw`, and `make demo`. `make demo` resets the selected database before seeding;
-  use `DATABASE_URL=sqlite:///./fundshift.db make demo` for an explicitly local demo.
+- **Development commands:** `make setup`, `make api`, `make web`, `make test`, and
+  `make ingest-raw`. The product itself is available at the hosted URL in the README.
 - **Deployment:** one Vercel project serves FastAPI from the repository root through `index.py`;
   another builds `frontend/`. The API build seeds a persistent database. Configure allowed
   frontend origins and the frontend's API URL as described in the README.
@@ -70,22 +69,26 @@ in float64, compare tests with `math.isclose(..., abs_tol=1e-9)`, and round for 
 Dollar holdings are entered in the planner; saved allocation weights sum to 1 when nonempty.
 
 **Catalog versus coverage.** `data/reference` contains a dated Nasdaq ETF catalog used for
-search. A searchable fund may have no holdings and remains visibly marked as missing. Bundled
-local data includes the catalog, ARKK issuer holdings, and synthetic DEMO, SPLT and FLOWTEST
-fixtures. iShares and SEC N-PORT snapshots can be imported separately. The app attempts a
+search. A searchable fund may have no holdings and remains visibly marked as missing. Committed
+production data includes the catalog and ARKK issuer holdings. Synthetic DEMO, SPLT and FLOWTEST
+files are isolated in `backend/tests/fixtures/` for regression tests, never deployment.
+iShares and SEC N-PORT snapshots can be imported separately. The app attempts a
 bounded TickerInside lookup when a newly added fund lacks stored provider holdings.
 
-**Source selection.** For each fund, choose its latest stored issuer/SEC snapshot unless a
-TickerInside snapshot is strictly newer or is the only source. On equal dates, keep the
-issuer/SEC snapshot. Never merge rows from different sources within a selected fund snapshot.
-Record the selected source and holdings date. TickerInside snapshots carry weights without
-shares or market values; issuer/SEC rows use positive market values for sector-mix weights.
+**Source selection.** The planner uses each fund's latest stored issuer/SEC snapshot unless a
+TickerInside snapshot is the only source, or is strictly newer and its classified share is at
+least the lesser of the issuer/SEC share and 80%. The portfolio API selects the strictly newer
+snapshot without that planner-specific classification gate. Equal dates keep issuer/SEC data.
+Never merge rows from different sources within a selected fund snapshot. Record the selected
+source and holdings date. TickerInside snapshots carry weights without shares or market values;
+issuer/SEC rows use positive market values for sector-mix weights.
 
 **Sectors.** The planner resolves issuer/SEC equity rows from `security_sectors`, then the
 issuer label, then `data/reference/name_sectors.csv`, then the sector assigned to the same
 security ID in an eligible ETF. Unresolved equities are `Unclassified`. Non-equity positive
 value rows are `Cash & other`. For TickerInside weights, resolve the ticker from stored
-issuer/SEC equity holdings and the ticker-sector reference; unknown symbols are unclassified.
+issuer/SEC equity holdings and the ticker-sector reference. The latter prefers U.S. listings
+over foreign local codes with the same symbol; unknown symbols are unclassified.
 The original `/funds/...` holdings and change-analysis API retains its narrower
 `security_sectors` → issuer label → `Unknown` classification contract.
 
@@ -124,15 +127,13 @@ address, as-of date, hash and import time for traceability.
 ## 6. Ingestion and refresh
 
 `scripts/seed_db.py` loads the committed catalog and issuer files during API deployment.
-`make demo` resets an explicitly selected local database, loads sample and raw files, and
-starts the API. Never run the reset command against a database with portfolios to preserve.
-
-The adapter interface in `backend/pipeline/adapters` handles local sample, ARK and iShares
-CSV files. Validation rejects missing required fields, mixed holdings dates, wrong funds,
-negative equity shares/value, duplicate security IDs, and reported-weight totals outside
-90%–110%. It warns outside 97%–103% or when a row's reported weight differs from its
-market-value weight by more than 0.1 pp. Normalize strings, uppercase tickers, convert weight
-units to fractions, and hash normalized rows before storing. `scripts/ingest_nport.py`
+The adapter interface in `backend/pipeline/adapters` handles ARK and iShares issuer files;
+the sample adapter parses test fixtures only. Validation rejects missing required fields,
+mixed holdings dates, wrong funds, negative equity shares/value, duplicate security IDs,
+and reported-weight totals outside 90%–110%. It warns outside 97%–103% or when a row's
+reported weight differs from its market-value weight by more than 0.1 pp. Normalize strings,
+uppercase tickers, convert weight units to fractions, and hash normalized rows before storing.
+`scripts/ingest_nport.py`
 imports selected SEC filings and the series/class mapping; it must not infer unsupported
 shares or market values. See `docs/etf-sources.md` for source-specific commands.
 
@@ -304,7 +305,7 @@ price/activity decomposition from §7, independent of provider weight-only rows.
 
 ### Reference files
 
-`data/reference/funds.csv`:
+`backend/tests/fixtures/funds.csv` (plus ARKK in `data/reference/funds.csv`):
 
 | ticker | name | issuer |
 |---|---|---|
@@ -313,7 +314,7 @@ price/activity decomposition from §7, independent of provider weight-only rows.
 | FLOWTEST | Flow Test Fund | Synthetic |
 | ARKK | ARK Innovation ETF | ARK Invest |
 
-`data/reference/sectors.csv`:
+`backend/tests/fixtures/sectors.csv`:
 
 | security_id | sector |
 |---|---|
@@ -322,9 +323,9 @@ price/activity decomposition from §7, independent of provider weight-only rows.
 | CCC, EEE | Financials |
 | FFF, GGG, HHH, JJJ, KKK, LLL | Technology |
 
-### Sample file format
+### Test fixture file format
 
-Sample files use columns `date,fund,security_id,ticker,name,asset_class,shares,price,market_value,weight`, with `weight` as a fraction. Use security_id as the ticker, and a name like `AAA Corp`.
+Test fixtures in `backend/tests/fixtures/` use columns `date,fund,security_id,ticker,name,asset_class,shares,price,market_value,weight`, with `weight` as a fraction. Use security_id as the ticker, and a name like `AAA Corp`.
 
 ### Fixture DEMO (no cash; tests set top_n = 2)
 
@@ -465,13 +466,12 @@ backend/
   analytics/    Sector mixes, allocation plans, holdings decomposition and portfolio aggregation
   app/          FastAPI routes, request/response schemas, SQLAlchemy models, Scythe
   pipeline/     Adapters, validation, normalization, source fetching and ingestion
-  tests/        Analytics, pipeline, planner, assistant and API regression suites
+  tests/        Analytics, pipeline, planner, assistant and API regression suites and fixtures
 frontend/
   app/          Landing (/), methodology (/methodology), planner (/app)
   components/   Marketing and planner components
   lib/          API clients, saving, sector helpers and branding
 data/
-  sample/       DEMO, SPLT and FLOWTEST fixtures
   raw/          Committed issuer files
   reference/    ETF catalog, fund metadata and maintained classification references
 docs/           Source-ingestion and API contracts
@@ -480,20 +480,19 @@ scripts/        Fetching, ingestion, catalog refresh and seeding
 
 ## 13. Product acceptance flow
 
-1. Run `make setup`, then start the explicitly local demo database and frontend using the README.
+1. Open the hosted site linked from the README.
 2. Open `/` and `/methodology`; the product name, workflow, formulas and limitations agree with
    the planner and this specification.
 3. Open `/app`, add ARKK and enter a dollar amount. Inspect its sector mix and source date.
-   The bundled demo does not include IVV or IYW issuer snapshots; the example portfolio's
-   coverage depends on the data available in the selected environment.
+   The example portfolio's coverage depends on the stored data available for its funds.
 4. Set a target with sliders and a supported plain-language request. The total is 100%; Scythe
    reports the changes, and the planner honors its fund constraints and available coverage.
 5. Preview a plan with “Use these amounts.” Reopen the saved URL in the owning browser; the
    amounts and target persist. In a browser without the edit key, edits create a separate copy.
-6. Verify the retained change-analysis API against §10, including DEMO's price/activity split,
-   SPLT's suspected corporate action, and FLOWTEST's creation/redemption adjustment.
-7. Re-ingest an identical snapshot; its outcome is `duplicate_noop` (the command prints
-   `already ingested`), and change-event IDs stay stable.
+6. Run `make test` to verify the change-analysis API against §10's isolated fixtures, including
+   DEMO's price/activity split, SPLT's suspected corporate action, and FLOWTEST's flow adjustment.
+7. The pipeline tests verify that re-ingesting identical data gives `duplicate_noop` and that
+   change-event IDs stay stable.
 
 ## 14. Limitations
 

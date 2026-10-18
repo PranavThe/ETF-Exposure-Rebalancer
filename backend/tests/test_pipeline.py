@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from backend.app import db
 from backend.app.models import Fund, Holding, ImportLog, Snapshot
 from backend.pipeline import load
-from backend.pipeline.run import run_pipeline
 
 from .conftest import SAMPLE_DIR, ingest
 from .golden import by_id, by_sector, close
@@ -267,7 +266,7 @@ def test_failure_mid_load_leaves_nothing_behind(db_url, monkeypatch):
 
     monkeypatch.setattr(load, "_insert_holding", flaky)
     with pytest.raises(ForcedFailure):
-        run_pipeline("DEMO", DEMO_1, adapter="sample")
+        ingest(DEMO_1, "DEMO")
     assert len(calls) == 3
     assert snapshot_count(as_of=date(2026, 10, 1)) == 0
     assert holding_count() == 0
@@ -275,7 +274,7 @@ def test_failure_mid_load_leaves_nothing_behind(db_url, monkeypatch):
 
 # --- Real ARK file (data/raw, committed; no network) ---
 
-ARKK_FILE = SAMPLE_DIR.parent / "raw" / "ARKK_2026-10-16.csv"
+ARKK_FILE = SAMPLE_DIR.parents[2] / "data" / "raw" / "ARKK_2026-10-16.csv"
 
 
 def test_ark_adapter_reads_the_issuer_format():
@@ -310,7 +309,7 @@ def test_real_ark_file_ingests_and_reingest_is_a_noop(db_url, capsys):
 def load_seed_script():
     import importlib.util
 
-    path = SAMPLE_DIR.parents[1] / "scripts" / "seed_db.py"
+    path = SAMPLE_DIR.parents[2] / "scripts" / "seed_db.py"
     spec = importlib.util.spec_from_file_location("seed_db", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -319,7 +318,7 @@ def load_seed_script():
 
 def test_seed_script_loads_production_data_and_is_rerunnable(db_url, monkeypatch, capsys):
     monkeypatch.delenv("VERCEL", raising=False)
-    monkeypatch.chdir(SAMPLE_DIR.parents[1])  # restored afterwards; the script chdirs to the repo root
+    monkeypatch.chdir(SAMPLE_DIR.parents[2])  # restored afterwards; the script chdirs to the repo root
     seed = load_seed_script()
     assert seed.main([]) == 0
     assert seed.main([]) == 0

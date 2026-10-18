@@ -51,8 +51,10 @@ the legacy `provider_holdings.ticker` column from `VARCHAR(32)` to `TEXT` before
   only when the fund has no saved TickerInside snapshot. A provider miss or temporary error is
   returned as a status so the app can keep using any SEC or issuer snapshot. The planner calls this
   for newly added funds and recalculates after the request completes.
-- The planner uses a stored TickerInside snapshot only when it is strictly newer than the latest
-  issuer/SEC snapshot or when no issuer/SEC snapshot exists. Equal dates select issuer/SEC data.
+- The planner uses a stored TickerInside snapshot when there is no issuer/SEC snapshot, or when
+  it is strictly newer and classifies at least as much of the fund as the issuer/SEC snapshot
+  (or at least 80%). Equal dates select issuer/SEC data. The portfolio API uses the newer-snapshot
+  rule without the planner's classification check.
 - `GET /provider-data/funds/{ticker}/holdings` returns the latest stored TickerInside weights,
   its source/as-of metadata and attribution line, plus entries, exits, and changed weights relative
   to the previous source date. An exit means the ticker is no longer reported, not proof of a sale.
