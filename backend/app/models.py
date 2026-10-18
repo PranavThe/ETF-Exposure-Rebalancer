@@ -22,6 +22,13 @@ class Fund(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class EtfCatalogEntry(Base):
+    __tablename__ = "etf_catalog"
+
+    ticker: Mapped[str] = mapped_column(String(16), primary_key=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Snapshot(Base):
     __tablename__ = "snapshots"
     __table_args__ = (UniqueConstraint("fund_id", "as_of_date"),)
@@ -72,3 +79,23 @@ class SecuritySector(Base):
 
     security_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     sector: Mapped[str] = mapped_column(String(100))
+
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    edit_key_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PortfolioFund(Base):
+    __tablename__ = "portfolio_funds"
+    __table_args__ = (UniqueConstraint("portfolio_id", "fund_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    portfolio_id: Mapped[str] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"))
+    fund_id: Mapped[int] = mapped_column(ForeignKey("funds.id"))
+    weight: Mapped[float] = mapped_column(Double)

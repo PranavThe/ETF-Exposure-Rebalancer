@@ -53,15 +53,33 @@ def analytics_rows(holdings: list[Holding]) -> list[dict]:
 
 
 @router.get("", response_model=list[FundOut])
-def list_funds(session: Session = Depends(get_session)):
+def list_funds(
+    loaded_only: bool = False,
+    limit: int | None = Query(default=None, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+):
     stats = (select(Snapshot.fund_id, func.count(Snapshot.id).label("n"),
                     func.max(Snapshot.as_of_date).label("latest"))
              .group_by(Snapshot.fund_id).subquery())
-    rows = session.execute(
-        select(Fund, stats.c.n, stats.c.latest).outerjoin(stats, stats.c.fund_id == Fund.id)
-        .order_by(Fund.ticker))
+    query = select(Fund, stats.c.n, stats.c.latest).outerjoin(stats, stats.c.fund_id == Fund.id)
+    if loaded_only:
+        query = query.where(stats.c.n > 0)
+    query = query.order_by(Fund.ticker).offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    rows = session.execute(query)
     return [{"ticker": f.ticker, "name": f.name, "issuer": f.issuer, "snapshot_count": n or 0,
              "latest_as_of_date": latest} for f, n, latest in rows]
+
+
+@router.get("/{ticker}", response_model=FundOut)
+def get_fund(ticker: str, session: Session = Depends(get_session)):
+    fund = fund_or_404(session, ticker)
+    count, latest = session.execute(select(func.count(Snapshot.id), func.max(Snapshot.as_of_date))
+                                    .where(Snapshot.fund_id == fund.id)).one()
+    return {"ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer,
+            "snapshot_count": count, "latest_as_of_date": latest}
 
 
 @router.get("/{ticker}/snapshots", response_model=list[SnapshotOut])

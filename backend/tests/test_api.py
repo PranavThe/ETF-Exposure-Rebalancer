@@ -129,6 +129,15 @@ def test_cors_origins_come_from_the_environment(monkeypatch):
     assert cors_origins() == LOCAL_ORIGINS + ["https://fundshift.vercel.app", "https://example.org"]
 
 
+def test_cors_origin_regex_comes_from_the_environment(monkeypatch):
+    from backend.app.main import cors_origin_regex
+
+    monkeypatch.delenv("CORS_ORIGIN_REGEX", raising=False)
+    assert cors_origin_regex() is None
+    monkeypatch.setenv("CORS_ORIGIN_REGEX", r" https://fundshift-[a-z0-9-]+\.vercel\.app ")
+    assert cors_origin_regex() == r"https://fundshift-[a-z0-9-]+\.vercel\.app"
+
+
 def test_local_frontend_origin_is_allowed(client):
     resp = client.get("/funds", headers={"Origin": "http://localhost:3000"})
     assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"

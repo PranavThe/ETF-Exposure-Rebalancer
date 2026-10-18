@@ -24,7 +24,7 @@ def validate(rows: list[Row], *, file: str, fund: str, known_funds: set[str],
         return columns.get(field, field)
 
     if fund not in known_funds:
-        raise ValidationError(file, None, "fund", f"{fund} is not in data/reference/funds.csv")
+        raise ValidationError(file, None, "fund", f"{fund} is not registered in the fund database")
     if not rows:
         raise ValidationError(file, None, None, "no holdings rows")
 

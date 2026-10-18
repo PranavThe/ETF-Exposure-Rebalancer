@@ -85,7 +85,7 @@ export default function DiscoverBoard() {
     body = (
       <Notice tone="error">
         {overviews.error}
-        <span className="mt-1 block text-xs text-muted">Discover reads every fund from the API; reload once it is up.</span>
+        <span className="mt-1 block text-xs text-muted">Discover reads featured funds with available snapshots; reload once the API is up.</span>
       </Notice>
     );
   } else if (!overviews.data) {
