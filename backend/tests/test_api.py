@@ -15,7 +15,7 @@ def get_changes(client, fund="DEMO", from_date="2026-10-01", to_date="2026-10-02
 
 def test_health(client):
     body = client.get("/health").json()
-    assert body == {"status": "ok", "db": "ok", "fund_count": 4, "snapshot_count": 7}
+    assert body == {"status": "ok", "db": "ok", "fund_count": 4, "snapshot_count": 7, "commit": ""}
 
 
 def test_funds(client):

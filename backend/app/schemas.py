@@ -10,6 +10,7 @@ class Health(BaseModel):
     db: str
     fund_count: int
     snapshot_count: int
+    commit: str = ""  # the deployed git commit, when the host reports one
 
 
 class FundOut(BaseModel):

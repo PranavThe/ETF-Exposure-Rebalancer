@@ -24,11 +24,11 @@ from backend.app.models import (Fund, Holding, ImportLog, PortfolioFund, Securit
                                 Snapshot)  # noqa: E402
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include-samples", action="store_true",
                         help="also ingest synthetic fixtures (for local demos only)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if os.environ.get("VERCEL") and not os.environ.get("DATABASE_URL"):
         print("DATABASE_URL is not set. Connect a Postgres database (Neon) to this Vercel project "

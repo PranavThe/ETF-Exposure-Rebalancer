@@ -321,8 +321,8 @@ def test_seed_script_loads_production_data_and_is_rerunnable(db_url, monkeypatch
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.chdir(SAMPLE_DIR.parents[1])  # restored afterwards; the script chdirs to the repo root
     seed = load_seed_script()
-    assert seed.main() == 0
-    assert seed.main() == 0
+    assert seed.main([]) == 0
+    assert seed.main([]) == 0
     out = output(capsys)
     assert out.count("already ingested") == 1  # only the real ARKK file is seeded by default
     with Session(db.get_engine()) as s:
@@ -332,5 +332,5 @@ def test_seed_script_loads_production_data_and_is_rerunnable(db_url, monkeypatch
 def test_seed_script_on_vercel_requires_a_database(monkeypatch, capsys):
     monkeypatch.setenv("VERCEL", "1")
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    assert load_seed_script().main() == 1
+    assert load_seed_script().main([]) == 1
     assert "DATABASE_URL" in output(capsys)
