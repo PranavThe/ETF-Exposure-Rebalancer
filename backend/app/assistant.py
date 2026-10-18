@@ -15,7 +15,9 @@ from pydantic import BaseModel, Field
 
 from backend.analytics.rebalance import CASH_OTHER, SECTORS, UNCLASSIFIED, canonical_sector, sector_order
 
-MODEL = "claude-opus-5-5"
+MODEL = "claude-haiku-5-5"
+# Models that accept the server-side refusal fallback (Haiku has none; a refusal just ends the reply).
+FALLBACK_MODELS = {"claude-sonnet-5-5", "claude-opus-5-5"}
 TARGET_SECTORS = [s for s in SECTORS if s != UNCLASSIFIED]
 Sector = Literal[
     "Technology", "Health Care", "Financials", "Consumer Discretionary", "Consumer Staples",
@@ -88,7 +90,7 @@ def _percent_list(mix: dict[str, float]) -> str:
 
 
 def ask_claude(client, message: str, history: list[dict], current: dict[str, float],
-               target: dict[str, float] | None, total: float) -> AssistantResult:
+               target: dict[str, float] | None, total: float, model: str = MODEL) -> AssistantResult:
     """One Messages API call with a JSON-schema output; raises anthropic errors to the caller."""
     state = (f"Current mix: {_percent_list(current)}.\n"
              f"Current target: {_percent_list(target) if target else 'not set'}.\n"
@@ -98,15 +100,18 @@ def ask_claude(client, message: str, history: list[dict], current: dict[str, flo
         {"type": "text", "text": state},
         {"type": "text", "text": message},
     ]})
-    response = client.beta.messages.create(
-        model=MODEL,
+    request = dict(
+        model=model,
         max_tokens=16000,
         system=SYSTEM_PROMPT,
         messages=messages,
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": READING_SCHEMA}},
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
     )
+    if model in FALLBACK_MODELS:
+        response = client.beta.messages.create(**request, betas=["server-side-fallback-2026-07-01"],
+                                               fallbacks="default")
+    else:
+        response = client.messages.create(**request)
     if response.stop_reason == "refusal":
         return AssistantResult(reply="I can't help with that one, but the sliders still work.",
                                target=None, cash_change=None, source="claude")

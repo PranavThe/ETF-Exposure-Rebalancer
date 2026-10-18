@@ -30,7 +30,8 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   `POST /chat` (`routes/chat.py`, `app/assistant.py`). Saved portfolios reuse the weights-based
   portfolio API; the dollar value and target live in `portfolio_preferences`.
 - The assistant only turns the user's words into a target mix; it never chooses one. It uses
-  `claude-opus-5-5` when `ANTHROPIC_API_KEY` is set, else the rule-based reader. Tests use a fake client.
+  `claude-haiku-5-5` (effort `low`, thinking on: off it gets the arithmetic wrong) when `ANTHROPIC_API_KEY`
+  is set, else the rule-based reader. Tests use a fake client.
 - Funds with issuer "Synthetic" (DEMO, SPLT, FLOWTEST) can be held but are never suggested.
 
 ## Units (SPEC §4)
