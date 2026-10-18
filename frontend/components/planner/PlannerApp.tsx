@@ -221,7 +221,7 @@ export default function PlannerApp() {
   }
 
   async function sendChat(message: string) {
-    const history = turns.map(({ role, content }) => ({ role, content }));
+    const history = turns.slice(-10).map(({ role, content }) => ({ role, content }));
     setTurns((t) => [...t, { role: "user", content: message }]);
     setChatBusy(true);
     try {
