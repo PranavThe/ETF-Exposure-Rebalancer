@@ -14,7 +14,7 @@ function Side({ label, fund, meta }: { label: string; fund: string; meta: Snapsh
               {meta.source_url}
             </a>
           ) : (
-            "Synthetic sample file"
+            "Source URL unavailable"
           )}
         </dd>
         <dt className="text-muted">File</dt>

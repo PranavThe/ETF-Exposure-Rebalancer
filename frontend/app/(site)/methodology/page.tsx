@@ -38,7 +38,7 @@ POSITION_SHARE_THRESHOLD    = 0.05     # 5% flow-adjusted share change
 POSITION_ACTIVITY_THRESHOLD = 0.001    # 0.1 pp of portfolio activity
 SECTOR_DRIFT_THRESHOLD      = 0.01     # 1.0 pp
 CONCENTRATION_THRESHOLD     = 0.01     # 1.0 pp
-TOP_N                       = 10       # DEMO uses 2
+TOP_N                       = 10
 MIN_FLOW_SECURITIES         = 3
 SPLIT_RATIOS                = (2, 3, 4, 5, 10, 20)
 SPLIT_RATIO_TOLERANCE       = 0.01     # 1%
@@ -162,17 +162,6 @@ price_effect + activity_effect = w1 − w0      (always, exactly)`}</Formula>
                 the part that comes from different share counts. Because both are measured against the same
                 counterfactual, they add back to the total change with nothing left over.
               </p>
-              <Formula label="Worked example · DEMO, BBB, 2026-10-01 → 2026-10-02">{`A   200 shares × $5 = $1,000 of $4,000   w0  = 25.0%
-CF  200 shares × $5 = $1,000 of $4,500   wcf = 22.2%
-B   300 shares × $5 = $1,500 of $5,000   w1  = 30.0%
-
-price effect        22.2% − 25.0%  =  −2.8 pp
-portfolio activity  30.0% − 22.2%  =  +7.8 pp
-total change                          +5.0 pp`}</Formula>
-              <p>
-                BBB&apos;s own price did not move, yet its price effect is negative: AAA rose 50%, so in the
-                counterfactual it takes a bigger share of the portfolio and everything else shrinks.
-              </p>
             </DocSection>
 
             <DocSection id="flow" index={n("flow")} title={t("flow")}>
@@ -186,10 +175,6 @@ adj_share_change[i] = (s_B[i] / s_A[i]) / flow_factor − 1`}</Formula>
                 <li>
                   With fewer than <C>3</C> holdings present in both snapshots, the flow factor falls back to{" "}
                   <C>1.0</C> and a caveat warns that fund flows may show up as portfolio activity.
-                </li>
-                <li>
-                  In the FLOW test fund every share count rises 10%. The flow factor is 1.10, every flow-adjusted share
-                  change is 0, and no events fire.
                 </li>
               </Bullets>
             </DocSection>
@@ -206,9 +191,7 @@ flag when   r or 1/r is within 1% of 2, 3, 4, 5, 10 or 20
               <p>
                 A flagged holding uses <C>s_A × r</C> in the counterfactual, gets a flow-adjusted share change of 0 and
                 the status unchanged, and never produces a position event. A{" "}
-                <C>SUSPECTED_CORPORATE_ACTION</C> event and a caveat point to it instead. In the SPLT test fund, FFF
-                goes from 100 to 200 shares while its price moves from $50.00 to $25.50: <C>r = 2.00</C> and{" "}
-                <C>(25.5 / 50) × 2 = 1.02</C>, so it is a suspected 2-for-1 split.
+                <C>SUSPECTED_CORPORATE_ACTION</C> event and a caveat point to it instead.
               </p>
             </DocSection>
 
@@ -235,10 +218,6 @@ flag when   r or 1/r is within 1% of 2, 3, 4, 5, 10 or 20
                 arrive or leave, its share of the portfolio moves even though its own share count did not. That part is
                 labelled <Term>dilution</Term>, never a position change.
               </p>
-              <p>
-                In DEMO, AAA and DDD are unchanged, yet their portfolio activity is −3.3 pp and −2.2 pp: BBB was
-                increased, CCC removed and EEE added around them.
-              </p>
             </DocSection>
 
             <DocSection id="sectors" index={n("sectors")} title={t("sectors")}>
@@ -255,9 +234,8 @@ activity_direct    sum over holdings that were added, removed,
                    increased or decreased
 activity_dilution  sum over unchanged holdings`}</Formula>
               <p>
-                Each sector also reports <C>w0</C>, <C>wcf</C> and <C>w1</C>. In DEMO, Technology&apos;s net drift is
-                0.0 pp, but that hides +5.6 pp from price and −5.6 pp of portfolio activity, all of it dilution. The
-                sector labels for ARKK are team-assigned categories, not an official classification such as GICS.
+                Each sector also reports <C>w0</C>, <C>wcf</C> and <C>w1</C>. The sector labels currently available for
+                ARKK are team-assigned categories, not an official classification such as GICS.
               </p>
             </DocSection>
 
@@ -266,9 +244,7 @@ activity_dilution  sum over unchanged holdings`}</Formula>
 HHI         = Σ w[i]²`}</Formula>
               <p>
                 Both are computed on <C>w0</C>, <C>wcf</C> and <C>w1</C>, so a change in concentration splits into price
-                and portfolio activity like any weight. N is 10, except for DEMO, which uses 2: it has only four
-                holdings, so a top-10 share would always be 100%. In DEMO the top-2 share goes from 50.0% to 60.0%:
-                +10.0 pp (price +5.6 pp, portfolio activity +4.4 pp).
+                and portfolio activity like any weight. The top-N measure uses the configured value of N.
               </p>
             </DocSection>
 
@@ -291,7 +267,7 @@ HHI         = Σ w[i]²`}</Formula>
                 Every event carries a plain-language description with its price and portfolio-activity split, following
                 one template:
               </p>
-              <Formula label="Description template">{`Health Care exposure +5.0 pp (price −2.8 pp, portfolio activity +7.8 pp)`}</Formula>
+              <Formula label="Description template">{`{subject} exposure {change} (price {price_effect}, portfolio activity {activity_effect})`}</Formula>
               <p>
                 Event IDs are deterministic. The same fund, dates and config always give the same IDs, so links and
                 notes stay valid across re-ingests:
@@ -328,8 +304,8 @@ HHI         = Σ w[i]²`}</Formula>
               <Formula>{ARK_CSV_URL}</Formula>
               <Bullets>
                 <li>
-                  The file covers only the latest market day, so history is built by fetching it on different days. The
-                  first stored snapshot is dated 2026-10-16; a comparison needs a second one.
+                  The file covers only the latest market day. Historical comparisons require separate dated snapshots
+                  to be fetched and ingested; the app does not invent missing dates.
                 </li>
                 <li>
                   Weights arrive in percent and the ARK adapter converts them to fractions. The file has no price,
@@ -338,12 +314,6 @@ HHI         = Σ w[i]²`}</Formula>
                   private placements with pseudo-CUSIPs and no ticker.
                 </li>
               </Bullets>
-              <p>
-                <Term>Synthetic test funds.</Term> Three small fixtures with known answers back the test suite and the
-                demo: <C>DEMO</C> (four holdings, with one position added, one removed and one increased), <C>SPLT</C>{" "}
-                (a 2-for-1 split that must not count as portfolio activity) and <C>FLOW</C> (every share count +10%,
-                pure fund flow, no events).
-              </p>
               <p>
                 <Term>Ingest.</Term> Every file goes adapter → validate → normalize → load in one transaction. The
                 content hash is sha256 over the normalized rows, so formatting differences in the raw file never change

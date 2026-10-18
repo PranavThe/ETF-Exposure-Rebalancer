@@ -16,7 +16,7 @@ Requires Python 3.11+ and Node 20+.
 ```
 make setup    # .venv + requirements-dev.txt, npm install in frontend/
 make test     # pytest: analytics, pipeline and API suites
-make demo     # reset the DB, ingest data/sample and data/raw, start the API on :8000
+make demo     # reset the local DB, ingest local test fixtures and data/raw, start the API on :8000
 make web      # second terminal: frontend on http://localhost:3000
 ```
 
@@ -36,7 +36,7 @@ make web      # second terminal: frontend on http://localhost:3000
    with links to the raw `/holdings` JSON.
 4. Re-run `make ingest-sample`. It prints `already ingested`, and the event IDs are unchanged.
 5. **SPLT**: FFF's share count doubled, but it is flagged as a suspected split, not an increased position.
-6. **FLOW**: every share count rose 10%. There are no events, because that was fund flow.
+6. **FLOWTEST**: every share count rose 10%. There are no events, because that was fund flow.
 7. **ARKK**: real issuer data (see below). It needs two snapshots before a comparison is possible;
    its holdings are on the **Fund** page.
 
@@ -47,7 +47,7 @@ the same project:
 
 | Route | What it shows |
 |---|---|
-| `/` | Landing page: what the product does, with the real DEMO numbers and a product screenshot |
+| `/` | Landing page describing the analysis workflow and available data sources |
 | `/methodology` | Every formula, rule and threshold behind the numbers |
 | `/discover` | Up to 24 loaded funds: featured comparison, latest events, largest weight changes, fund cards |
 | `/portfolio` | Create and edit weighted ETF portfolios; latest holdings, exposure, overlap, and coverage |
@@ -91,7 +91,7 @@ python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.cs
 ```
 
 Adapter → validate → normalize → load, in one transaction. The adapter defaults to `ark` for ARKK
-and to `sample` otherwise.
+and to `sample` only for the local fixture tickers. Other funds must name their adapter explicitly.
 
 | Outcome | Exit code | When |
 |---|---|---|
@@ -176,10 +176,14 @@ One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on
    project. Select Production (and Preview if you want), and leave the environment variable prefix
    empty so the variable is called `DATABASE_URL`.
 4. **Deployments → Redeploy.** The build command in `vercel.json` (`python scripts/seed_db.py`)
-   loads `data/sample` and `data/raw` into Neon. The build log shows the `inserted ...` lines.
+   removes previously seeded local fixtures, then loads real issuer files from `data/raw` into Neon.
+   Synthetic fixtures in `data/sample` are excluded from production builds. Existing synthetic fund
+   rows referenced by a saved portfolio are retained without their fixture snapshots. The build log
+   shows the `inserted ...` lines.
    Later deploys print `already ingested` and load only new files, so committing a new
    `data/raw/ARKK_<date>.csv` is enough to add a snapshot.
-5. Check `https://<api-domain>/health`. It should report `"snapshot_count": 8`.
+5. Check `https://<api-domain>/health`. With the single committed ARKK source file, it should report
+   `"snapshot_count": 1` on a clean database.
 
 **2. Frontend project**
 1. Import the same repo again as a second project, for example `fundshift`, with
@@ -213,9 +217,9 @@ backend/pipeline/   adapters (sample, ark), validate, normalize, load, reference
 backend/analytics/  pure functions: weights, decompose, sectors, concentration, events, compare
 backend/tests/      golden values from SPEC §10, pipeline and API tests
 frontend/           Next.js + Tailwind + Recharts: marketing site and the terminal app (see Frontend)
-data/sample/        synthetic fixtures (DEMO, SPLT, FLOW)
+data/sample/        local-only snapshots and fund/sector references for DEMO, SPLT, FLOWTEST; excluded from production builds
 data/raw/           real issuer files
-data/reference/     funds.csv, sectors.csv
+data/reference/     production fund reference and sector mappings
 scripts/            run_pipeline.py, fetch_holdings.py, seed_db.py (Vercel build step)
 index.py, vercel.json  Vercel entrypoint and build config for the API
 ```

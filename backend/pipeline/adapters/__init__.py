@@ -8,7 +8,12 @@ ADAPTERS: dict[str, type[Adapter]] = {"sample": SampleAdapter, "ark": ArkAdapter
 
 
 def default_adapter_for(fund: str) -> str:
-    return "ark" if fund.upper() == "ARKK" else "sample"
+    ticker = fund.upper()
+    if ticker == "ARKK":
+        return "ark"
+    if ticker in {"DEMO", "SPLT", "FLOWTEST"}:
+        return "sample"
+    raise ValueError(f"No default holdings adapter for {ticker}; choose one explicitly")
 
 
 __all__ = ["ADAPTERS", "Adapter", "ArkAdapter", "IsharesAdapter", "Row", "SampleAdapter", "ValidationError",

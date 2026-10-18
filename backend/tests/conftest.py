@@ -32,8 +32,11 @@ def load_sample():
 
 @pytest.fixture
 def sector_map() -> dict[str, str]:
-    with open(REFERENCE_DIR / "sectors.csv", newline="") as f:
-        return {r["security_id"]: r["sector"] for r in csv.DictReader(f)}
+    sectors = {}
+    for path in (SAMPLE_DIR / "sectors.csv", REFERENCE_DIR / "sectors.csv"):
+        with open(path, newline="") as f:
+            sectors.update({r["security_id"]: r["sector"] for r in csv.DictReader(f)})
+    return sectors
 
 
 @pytest.fixture
@@ -57,7 +60,9 @@ def ingest(path: Path, fund: str, *extra: str) -> int:
 
 def ingest_all_samples() -> None:
     for path in sorted(SAMPLE_DIR.glob("*.csv")):
-        assert ingest(path, path.name.split("_")[0].upper()) == 0, path
+        if path.name in {"funds.csv", "sectors.csv"}:
+            continue
+        assert ingest(path, path.name.split("_")[0].upper(), "--adapter", "sample") == 0, path
 
 
 @pytest.fixture

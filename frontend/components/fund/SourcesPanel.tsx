@@ -11,7 +11,7 @@ function host(url: string): string {
   }
 }
 
-/** Where each stored snapshot came from: issuer URL or sample file, content hash, row count. */
+/** Where each stored snapshot came from: source URL, content hash, and row count. */
 export default function SourcesPanel({ fund, snapshots }: { fund: string; snapshots: Snapshot[] | undefined }) {
   const latest = snapshots?.[snapshots.length - 1];
   const list = snapshots ? [...snapshots].reverse() : [];
@@ -62,7 +62,7 @@ export default function SourcesPanel({ fund, snapshots }: { fund: string; snapsh
                 </a>
               ) : (
                 <span className="min-w-0 truncate text-faint" title={s.source_file}>
-                  Synthetic sample file
+                  Source URL unavailable
                 </span>
               )}
               <span className="shrink-0 font-mono text-faint" title={`SHA-256 ${s.content_hash}`}>

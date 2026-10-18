@@ -177,7 +177,7 @@ export default function MoversBoard() {
     })),
   ];
 
-  const profileFund = selected?.ticker ?? "DEMO";
+  const profileFund = selected?.ticker ?? fundList[0]?.ticker ?? "";
   const loading = overviews.loading || funds.loading;
   const error = overviews.error ?? funds.error;
 

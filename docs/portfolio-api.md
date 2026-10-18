@@ -13,7 +13,7 @@ startup with SQLAlchemy `metadata.create_all`. No existing table is changed.
   "name": "My portfolio",
   "funds": [
     {"ticker": "DEMO", "weight": 0.6},
-    {"ticker": "FLOW", "weight": 0.4}
+    {"ticker": "FLOWTEST", "weight": 0.4}
   ]
 }
 ```

@@ -20,7 +20,7 @@ def test_health(client):
 
 def test_funds(client):
     funds = {f["ticker"]: f for f in client.get("/funds").json()}
-    assert set(funds) == {"DEMO", "SPLT", "FLOW", "ARKK"}
+    assert set(funds) == {"DEMO", "SPLT", "FLOWTEST", "ARKK"}
     assert funds["DEMO"]["name"] == "Demo Active Fund"
     assert funds["DEMO"]["snapshot_count"] == 3
     assert funds["DEMO"]["latest_as_of_date"] == "2026-10-03"
@@ -81,7 +81,7 @@ def test_changes_splt_and_flow(client):
     assert [(e["type"], e["subject"]) for e in splt["events"]] == [
         ("SUSPECTED_CORPORATE_ACTION", "FFF")
     ]
-    flow = get_changes(client, "FLOW").json()
+    flow = get_changes(client, "FLOWTEST").json()
     assert close(flow["flow_factor"], 1.1)
     assert flow["events"] == []
 

@@ -151,10 +151,10 @@ def test_splt_flags_split_not_increase(load_sample, sector_map):
     assert event["contributing_security_ids"] == ["FFF"]
 
 
-# --- FLOW ---
+# --- FLOWTEST ---
 
 def test_flow_is_not_portfolio_activity(load_sample, sector_map):
-    r = compare(load_sample, sector_map, "FLOW", "2026-10-01", "2026-10-02")
+    r = compare(load_sample, sector_map, "FLOWTEST", "2026-10-01", "2026-10-02")
     assert close(r["flow_factor"], 1.1)
     for h in r["holdings"]:
         assert h["status"] == "UNCHANGED", h["security_id"]

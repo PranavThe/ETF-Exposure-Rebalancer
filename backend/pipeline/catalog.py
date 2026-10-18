@@ -55,6 +55,9 @@ def sync_etf_catalog(session: Session, etfs: dict[str, str]) -> tuple[int, int]:
         if fund is None:
             session.add(Fund(ticker=ticker, name=name, issuer=""))
             inserted += 1
+        elif fund.issuer == "Synthetic":
+            fund.name, fund.issuer = name, ""
+            updated += 1
         elif not fund.issuer and fund.name != name:
             fund.name = name
             updated += 1

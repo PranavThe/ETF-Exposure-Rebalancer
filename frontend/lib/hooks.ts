@@ -134,13 +134,12 @@ export function useQueryState() {
   };
 }
 
-/** The requested fund if it exists, else DEMO or the first fund that can be compared. */
+/** The requested fund if it exists, otherwise the first fund that can be compared. */
 export function pickFund(funds: Fund[], requested?: string): string {
   const wanted = requested?.toUpperCase();
   const comparable = funds.filter((f) => f.snapshot_count >= 2);
   return (
     funds.find((f) => f.ticker === wanted)?.ticker ??
-    comparable.find((f) => f.ticker === "DEMO")?.ticker ??
     comparable[0]?.ticker ??
     funds[0]?.ticker ??
     ""

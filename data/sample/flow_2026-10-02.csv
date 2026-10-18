@@ -1,4 +1,0 @@
-date,fund,security_id,ticker,name,asset_class,shares,price,market_value,weight
-2026-10-02,FLOW,JJJ,JJJ,JJJ Corp,equity,110,10,1100,0.3333333333
-2026-10-02,FLOW,KKK,KKK,KKK Corp,equity,110,10,1100,0.3333333333
-2026-10-02,FLOW,LLL,LLL,LLL Corp,equity,110,10,1100,0.3333333333
