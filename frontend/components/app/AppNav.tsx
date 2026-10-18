@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { apiDocsUrl } from "@/lib/api";
+import { api, apiDocsUrl, type Fund } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
-import { useFunds, useHealth } from "@/lib/hooks";
+import { useHealth } from "@/lib/hooks";
 
 const LINKS = [
   { href: "/discover", label: "Discover" },
@@ -17,19 +17,35 @@ const LINKS = [
 ];
 
 function FundSearch() {
-  const funds = useFunds().data ?? [];
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [searchResult, setSearchResult] = useState<{ term: string; matches: Fund[]; loading: boolean } | null>(null);
   const [open, setOpen] = useState(false);
   const q = query.trim().toLowerCase();
-  const matches = funds.filter(
-    (f) => !q || f.ticker.toLowerCase().includes(q) || f.name.toLowerCase().includes(q),
-  );
+  const currentResult = searchResult?.term === query.trim() ? searchResult : null;
+  const matches = currentResult?.matches ?? [];
+  const loading = Boolean(q) && (!currentResult || currentResult.loading);
 
-  function go(ticker: string) {
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setSearchResult({ term, matches: [], loading: true });
+      api.searchEtfs(term, controller.signal).then((funds) => {
+        if (!controller.signal.aborted) setSearchResult({ term, matches: funds, loading: false });
+      }).catch(() => {
+        if (!controller.signal.aborted) setSearchResult({ term, matches: [], loading: false });
+      });
+    }, 180);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [query]);
+
+  function go(fund: Fund) {
     setQuery("");
     setOpen(false);
-    router.push(`/terminal?fund=${ticker}`);
+    const ticker = encodeURIComponent(fund.ticker);
+    router.push(fund.snapshot_count >= 2 ? `/terminal?fund=${ticker}` : `/fund?fund=${ticker}`);
   }
 
   return (
@@ -40,29 +56,32 @@ function FundSearch() {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && matches[0]) go(matches[0].ticker);
+          if (e.key === "Enter" && matches[0]) go(matches[0]);
           if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Search loaded funds"
-        aria-label="Search loaded funds"
+        placeholder="Search all ETFs"
+        aria-label="Search all ETFs"
         className="h-8 w-full rounded-md border border-line bg-panel px-3 text-center text-sm text-fg placeholder:text-faint focus:border-line-2 focus:text-left focus:outline-none"
       />
-      {open && matches.length > 0 && (
+      {open && q && (
         <ul className="absolute inset-x-0 top-9 z-30 overflow-hidden rounded-md border border-line-2 bg-panel-2 py-1 shadow-xl">
+          {loading && matches.length === 0 && <li className="px-3 py-2 text-xs text-muted">Searching the ETF catalog…</li>}
+          {!loading && matches.length === 0 && <li className="px-3 py-2 text-xs text-muted">No matching ETFs.</li>}
           {matches.slice(0, 20).map((f) => (
             <li key={f.ticker}>
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => go(f.ticker)}
+                onClick={() => go(f)}
                 className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-panel-3"
               >
                 <span>
                   <span className="font-semibold">{f.ticker}</span>{" "}
                   <span className="text-muted">{f.name}</span>
                 </span>
-                <span className="font-mono text-xs text-faint">
-                  {f.snapshot_count} snapshot{f.snapshot_count === 1 ? "" : "s"}
+                <span className="shrink-0 text-right font-mono text-[10px] text-faint">
+                  <span className="block">{f.snapshot_count >= 2 ? "comparison ready" : f.snapshot_count === 1 ? "1 snapshot · pending" : "no holdings yet"}</span>
+                  {f.latest_as_of_date && <span className="block">latest {f.latest_as_of_date}</span>}
                 </span>
               </button>
             </li>

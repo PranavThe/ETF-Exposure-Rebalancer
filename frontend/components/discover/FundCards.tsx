@@ -105,6 +105,10 @@ export function FundCard({ o }: { o: FundOverview }) {
           <div className="mt-0.5 text-xs text-muted">
             <span className="font-mono">{o.fund.ticker}</span> · {o.fund.issuer}
           </div>
+          <div className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] ${o.snapshots.length >= 2 ? "bg-up/10 text-up" : o.snapshots.length === 1 ? "bg-price/10 text-price" : "bg-panel-3 text-faint"}`}>
+            {o.snapshots.length >= 2 ? "Comparison ready" : o.snapshots.length === 1 ? "One snapshot · waiting for next" : "No holdings snapshot"}
+            {o.fund.latest_as_of_date && <span className="ml-1.5 opacity-80">· latest {shortDate(o.fund.latest_as_of_date)}</span>}
+          </div>
         </div>
       </header>
 
