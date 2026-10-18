@@ -7,12 +7,14 @@ import { AnimatedNumber } from "./ui";
 
 /** A slow tape of ETFs with sector data, Kairos-discover style. Click one to add it. */
 export function TickerTape({ etfs, onPick }: { etfs: CoveredEtf[]; onPick: (etf: { ticker: string; name: string }) => void }) {
-  const items = etfs.filter((e) => !e.sample).slice(0, 40);
+  // Funds whose largest slice is "Unclassified" say little about sectors, so they stay off the tape.
+  const row = etfs
+    .filter((e) => !e.sample)
+    .map((e) => ({ ...e, top: e.sectors.slice().sort((a, b) => b.weight - a.weight)[0] }))
+    .filter((e) => e.top && e.top.sector !== "Unclassified")
+    .slice(0, 40);
+  const items = row;
   if (items.length < 4) return null;
-  const row = items.map((e) => {
-    const top = e.sectors.slice().sort((a, b) => b.weight - a.weight)[0];
-    return { ...e, top };
-  });
   return (
     <div className="relative h-9 shrink-0 overflow-hidden border-b border-line bg-canvas/60">
       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-canvas to-transparent" />
