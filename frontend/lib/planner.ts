@@ -176,19 +176,30 @@ export function usd(x: number, cents = false): string {
 
 // ---- API -----------------------------------------------------------------------------------
 
-async function call<T>(path: string, init?: RequestInit & { editKey?: string }): Promise<T> {
+async function call<T>(path: string, init?: RequestInit & { editKey?: string; retry?: boolean }): Promise<T> {
   let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, {
+  const send = () =>
+    fetch(`${API_URL}${path}`, {
       ...init,
       headers: {
         ...(init?.body ? { "Content-Type": "application/json" } : {}),
         ...(init?.editKey ? { "X-Portfolio-Edit-Key": init.editKey } : {}),
       },
     });
+  try {
+    res = await send();
   } catch (err) {
     if (init?.signal?.aborted) throw err;
-    throw new Error("Could not reach the server. Check your connection and try again.");
+    if (!init?.retry) throw new Error("Could not reach the server. Check your connection and try again.");
+    // Read-only requests try once more after a moment: a blip (e.g. during a deploy) shouldn't show.
+    await new Promise((r) => setTimeout(r, 700));
+    if (init.signal?.aborted) throw err;
+    try {
+      res = await send();
+    } catch (again) {
+      if (init.signal?.aborted) throw again;
+      throw new Error("Could not reach the server. Check your connection and try again.");
+    }
   }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -205,18 +216,18 @@ export type PlanRequest = {
 };
 
 export const planner = {
-  covered: () => call<CoveredEtf[]>("/etfs/covered"),
+  covered: () => call<CoveredEtf[]>("/etfs/covered", { retry: true }),
   search: (q: string, signal?: AbortSignal): Promise<Fund[]> => api.searchEtfs(q, signal),
   plan: (body: PlanRequest, signal?: AbortSignal) =>
-    call<PlanResult>("/plan", { method: "POST", body: JSON.stringify(body), signal }),
+    call<PlanResult>("/plan", { method: "POST", body: JSON.stringify(body), signal, retry: true }),
   chat: (body: { message: string; history: ChatTurn[]; current: Mix; target: Mix | null; total: number }, signal?: AbortSignal) =>
     call<ChatReply>("/chat", { method: "POST", body: JSON.stringify(body), signal }),
   companies: (holdings: { ticker: string; amount: number }[], signal?: AbortSignal) =>
-    call<Companies>("/exposure/companies", { method: "POST", body: JSON.stringify({ holdings }), signal }),
+    call<Companies>("/exposure/companies", { method: "POST", body: JSON.stringify({ holdings }), signal, retry: true }),
   explainPlan: (body: PlanRequest & { kind: string }, signal?: AbortSignal) =>
-    call<PlanExplanation>("/explain/plan", { method: "POST", body: JSON.stringify(body), signal }),
+    call<PlanExplanation>("/explain/plan", { method: "POST", body: JSON.stringify(body), signal, retry: true }),
   explainEtf: (ticker: string, signal?: AbortSignal) =>
-    call<EtfExplanation>("/explain/etf", { method: "POST", body: JSON.stringify({ ticker }), signal }),
+    call<EtfExplanation>("/explain/etf", { method: "POST", body: JSON.stringify({ ticker }), signal, retry: true }),
 };
 
 /** "Gemini 3.5 Flash Lite" from "gemini-3.5-flash-lite". */
