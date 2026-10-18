@@ -118,8 +118,26 @@ def ask_claude(client, message: str, history: list[dict], current: dict[str, flo
     text = next((b.text for b in response.content if b.type == "text"), "")
     reading = Reading.model_validate(json.loads(text))
     mix = tidy({p.sector: p.percent for p in reading.target}) if reading.changed else None
-    return AssistantResult(reply=reading.reply.strip(), target=mix, source="claude")
+    return AssistantResult(reply=plain_words(reading.reply.strip()), target=mix, source="claude")
 
+
+
+# The UI never says buy, sell or trade, or what anyone believes or thinks (SPEC §9). The prompt asks
+# for this, but a reply that refuses a request sometimes echoes the user's words, so swap them here.
+PLAIN_WORDS = [
+    (r"buy(?:ing)? (?:or|and) sell(?:ing)?", "pick"), (r"trade-offs", "compromises"), (r"trade-off", "compromise"),
+    (r"bought", "added"), (r"buying", "adding"), (r"buys", "adds"), (r"buy", "add"),
+    (r"sold", "reduced"), (r"selling", "reducing"), (r"sells", "reduces"), (r"sell", "reduce"),
+    (r"trading", "investment"), (r"traded", "moved"), (r"trades", "moves"), (r"trade", "move"),
+    (r"believes", "says"), (r"thinks", "says"),
+]
+
+
+def plain_words(text: str) -> str:
+    for word, plain in PLAIN_WORDS:
+        text = re.sub(rf"\b{word}\b", lambda m: plain.capitalize() if m.group(0)[0].isupper() else plain,
+                      text, flags=re.IGNORECASE)
+    return text
 
 READING_SCHEMA = {
     "type": "object",

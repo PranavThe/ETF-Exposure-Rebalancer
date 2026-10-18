@@ -167,6 +167,10 @@ def test_plan_rejects_bad_input(client):
     assert client.post("/plan", json={"holdings": holdings, "target": {"Technology": 0}}).status_code == 422
     assert client.post("/plan", json={"holdings": holdings, "target": {"Technology": -1}}).status_code == 422
     assert client.post("/plan", json={"holdings": [{"ticker": "TECHX", "amount": -5}]}).status_code == 422
+    # NaN and Infinity are refused with a readable 422, not a 500 from echoing them back as JSON.
+    for raw in ('{"holdings": [{"ticker": "TECHX", "amount": NaN}]}', '{"holdings": [], "cash_change": Infinity}'):
+        response = client.post("/plan", content=raw, headers={"content-type": "application/json"})
+        assert response.status_code == 422 and response.json()["detail"][0]["type"] == "finite_number"
 
 
 def test_preferences_need_the_edit_key(client):

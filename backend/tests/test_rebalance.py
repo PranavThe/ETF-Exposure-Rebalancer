@@ -1,9 +1,11 @@
 import math
+import random
 
 import pytest
 
 from backend.analytics.rebalance import (
     CASH_OTHER,
+    MIN_GAIN,
     UNCLASSIFIED,
     build_plans,
     canonical_sector,
@@ -135,6 +137,43 @@ def test_plans_never_move_away_from_the_target():
                 assert plan.distance <= before + 1e-9, (target, cash, plan.kind)
                 assert math.isclose(sum(plan.allocation.values()), plan.total_after, abs_tol=1e-6)
                 assert all(v >= 0 for v in plan.allocation.values())
+
+
+
+def test_a_plan_that_would_not_come_closer_is_dropped():
+    # Real S&P 500, Nasdaq-100 and dividend mixes (rounded) against a utilities and real estate
+    # target. The least-squares rearrangement shifts money to the dividend fund, which lowers the
+    # squared error but leaves the match worse; that plan must not be offered.
+    weights = {
+        "VOO": {"Technology": 0.378, "Health Care": 0.089, "Financials": 0.114, "Consumer Discretionary": 0.093,
+                "Consumer Staples": 0.045, "Communication Services": 0.097, "Industrials": 0.089,
+                "Energy": 0.029, "Utilities": 0.022, "Materials": 0.018, "Real Estate": 0.017,
+                CASH_OTHER: 0.004, UNCLASSIFIED: 0.006},
+        "QQQ": {"Technology": 0.574, "Health Care": 0.044, "Financials": 0.002, "Consumer Discretionary": 0.099,
+                "Consumer Staples": 0.062, "Communication Services": 0.123, "Industrials": 0.058,
+                "Energy": 0.005, "Utilities": 0.011, "Materials": 0.01, UNCLASSIFIED: 0.013},
+        "SCHD": {"Technology": 0.159, "Health Care": 0.183, "Financials": 0.09, "Consumer Discretionary": 0.065,
+                 "Consumer Staples": 0.177, "Communication Services": 0.06, "Industrials": 0.108,
+                 "Energy": 0.146, CASH_OTHER: 0.001, UNCLASSIFIED: 0.01},
+    }
+    amounts = {"VOO": 10000, "QQQ": 5000, "SCHD": 3000}
+    target = {"Energy": 0.0001, "Utilities": 0.5, "Real Estate": 0.4999}
+    assert build_plans(amounts, weights, target, max_new_funds=0) == []
+
+
+def test_every_plan_comes_at_least_min_gain_closer():
+    rng = random.Random(1)
+    sectors = ["Technology", "Health Care", "Financials", "Energy", "Utilities", "Real Estate", "Industrials"]
+    for _ in range(150):
+        weights = {}
+        for fund in "ABCD":
+            raw = {s: rng.random() ** 3 for s in rng.sample(sectors, rng.randint(2, 5))}
+            weights[fund] = {s: v / sum(raw.values()) for s, v in raw.items()}
+        amounts = {f: rng.choice([1000, 5000, 20000]) for f in "ABC"}
+        target = normalize_target({s: rng.random() for s in rng.sample(sectors, rng.randint(1, 4))})
+        before = distance(exposure(amounts, weights), target)
+        for plan in build_plans(amounts, weights, target, max_new_funds=1):
+            assert plan.distance <= before - MIN_GAIN + 1e-12, (amounts, target, plan.kind)
 
 
 def test_held_fund_without_data_is_kept_out_of_planning():
