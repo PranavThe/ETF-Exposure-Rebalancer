@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import EtfCatalogEntry, Fund, Snapshot
+from ..models import EtfCatalogEntry, Fund, ProviderHoldingsSnapshot, Snapshot
 from ..schemas import FundOut
 
 router = APIRouter(prefix="/etfs", tags=["etfs"])
@@ -22,9 +22,14 @@ def search_etfs(
                func.max(Snapshot.as_of_date).label("as_of_date"))
         .group_by(Snapshot.fund_id).subquery()
     )
-    query = (select(Fund, latest.c.n, latest.c.as_of_date)
+    provider_latest = (select(ProviderHoldingsSnapshot.fund_ticker,
+                              func.max(ProviderHoldingsSnapshot.as_of_date).label("as_of_date"))
+                       .where(ProviderHoldingsSnapshot.provider == "tickerinside")
+                       .group_by(ProviderHoldingsSnapshot.fund_ticker).subquery())
+    query = (select(Fund, latest.c.n, latest.c.as_of_date, provider_latest.c.as_of_date)
              .join(EtfCatalogEntry, EtfCatalogEntry.ticker == Fund.ticker)
-             .outerjoin(latest, latest.c.fund_id == Fund.id))
+             .outerjoin(latest, latest.c.fund_id == Fund.id)
+             .outerjoin(provider_latest, provider_latest.c.fund_ticker == Fund.ticker))
     term = q.strip()
     if term:
         escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -34,6 +39,7 @@ def search_etfs(
     query = query.order_by(Fund.ticker).limit(limit)
     return [
         {"ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer,
-         "snapshot_count": count or 0, "latest_as_of_date": as_of_date}
-        for fund, count, as_of_date in session.execute(query)
+         "snapshot_count": count or 0, "latest_as_of_date": as_of_date,
+         "provider_holdings_as_of_date": provider_as_of_date}
+        for fund, count, as_of_date, provider_as_of_date in session.execute(query)
     ]

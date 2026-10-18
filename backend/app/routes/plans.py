@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.analytics.rebalance import (
+    UNCLASSIFIED,
     build_plans,
     distance,
     exposure,
@@ -17,7 +18,8 @@ from backend.analytics.rebalance import (
 from backend.analytics.sectors import resolve_sector
 
 from ..db import get_session
-from ..models import Fund, Holding, PortfolioPreference, Snapshot, utcnow
+from ..models import (Fund, Holding, PortfolioPreference, ProviderHolding,
+                      ProviderHoldingsSnapshot, Snapshot, utcnow)
 from ..plan_schemas import CoveredEtf, PlanIn, PlanResult, PreferencesIn, PreferencesOut
 from .funds import sector_map
 from .portfolios import portfolio_or_404, require_edit_key
@@ -31,16 +33,16 @@ SAMPLE_ISSUER = "Synthetic"
 _mix_cache: dict[tuple[int, str], dict[str, float]] = {}
 
 
-def latest_universe(session: Session) -> dict[str, tuple[Fund, date, dict[str, float]]]:
-    """ticker -> (fund, as_of_date, sector mix) for every fund's latest snapshot with holdings."""
+def latest_universe(session: Session) -> dict[str, tuple[Fund, date, dict[str, float], str, str | None]]:
+    """Latest issuer/SEC or TickerInside holdings with their sector mix and provenance."""
     latest = (select(Snapshot.fund_id, func.max(Snapshot.as_of_date).label("as_of_date"))
               .group_by(Snapshot.fund_id).subquery())
     pairs = [(fund, snapshot) for fund, snapshot in session.execute(
         select(Fund, Snapshot).join(Snapshot, Snapshot.fund_id == Fund.id).join(
             latest, (latest.c.fund_id == Snapshot.fund_id) & (latest.c.as_of_date == Snapshot.as_of_date)))]
+    sectors = sector_map(session)
     missing = [s.id for _, s in pairs if (s.id, s.content_hash) not in _mix_cache]
     if missing:
-        sectors = sector_map(session)
         rows: dict[int, list[dict]] = {}
         for h in session.execute(
             select(Holding.snapshot_id, Holding.security_id, Holding.asset_class,
@@ -54,11 +56,75 @@ def latest_universe(session: Session) -> dict[str, tuple[Fund, date, dict[str, f
         for fund, snapshot in pairs:
             if snapshot.id in rows or snapshot.id in missing:
                 _mix_cache[(snapshot.id, snapshot.content_hash)] = fund_sector_weights(rows.get(snapshot.id, []))
-    universe = {}
+    sec_by_ticker = {}
     for fund, snapshot in pairs:
         mix = _mix_cache[(snapshot.id, snapshot.content_hash)]
         if mix:
-            universe[fund.ticker] = (fund, snapshot.as_of_date, mix)
+            source = "sec" if "sec.gov" in snapshot.source_url.lower() else "issuer"
+            sec_by_ticker[fund.ticker] = (fund, snapshot.as_of_date, mix, source, None)
+
+    # TickerInside supplies weights keyed by symbol, but not SEC CUSIPs. Reuse the most recent
+    # sector classification observed for each ticker in our issuer/SEC holdings; unknown symbols
+    # stay Unclassified instead of receiving an invented sector.
+    ticker_sectors = {}
+    for row in session.execute(
+        select(Holding.ticker, Holding.security_id, Holding.source_sector,
+               Holding.asset_class, Snapshot.as_of_date)
+        .join(Snapshot, Snapshot.id == Holding.snapshot_id)
+        .where(Holding.ticker != "")
+        .order_by(Snapshot.as_of_date.desc(), Holding.id.desc())
+    ):
+        ticker = row.ticker.upper()
+        if ticker not in ticker_sectors:
+            ticker_sectors[ticker] = (
+                resolve_sector(row.security_id, row.source_sector, sectors)
+                if row.asset_class == "equity" else "Cash & other"
+            )
+
+    provider_latest = list(session.scalars(
+        select(ProviderHoldingsSnapshot)
+        .where(ProviderHoldingsSnapshot.provider == "tickerinside")
+        .order_by(ProviderHoldingsSnapshot.fund_ticker,
+                  ProviderHoldingsSnapshot.as_of_date.desc(),
+                  ProviderHoldingsSnapshot.fetched_at.desc())
+    ))
+    provider_by_ticker = {}
+    for snapshot in provider_latest:
+        provider_by_ticker.setdefault(snapshot.fund_ticker, snapshot)
+    provider_mix = {}
+    if provider_by_ticker:
+        provider_fund_by_snapshot = {s.id: s.fund_ticker for s in provider_by_ticker.values()}
+        for row in session.execute(
+            select(ProviderHolding.snapshot_id, ProviderHolding.ticker, ProviderHolding.weight)
+            .where(ProviderHolding.snapshot_id.in_(s.id for s in provider_by_ticker.values()))
+        ):
+            fund_ticker = provider_fund_by_snapshot.get(row.snapshot_id)
+            if fund_ticker is None:
+                continue
+            ticker = row.ticker.upper()
+            sector = ticker_sectors.get(ticker, UNCLASSIFIED)
+            mix = provider_mix.setdefault(fund_ticker, {})
+            mix[sector] = mix.get(sector, 0.0) + row.weight
+    for ticker, mix in provider_mix.items():
+        total = sum(mix.values())
+        if total > 0:
+            provider_mix[ticker] = {sector: weight / total for sector, weight in mix.items()}
+
+    universe = dict(sec_by_ticker)
+    funds_by_ticker = {fund.ticker: fund for fund, _ in pairs}
+    if provider_by_ticker:
+        funds_by_ticker.update({fund.ticker: fund for fund in session.scalars(
+            select(Fund).where(Fund.ticker.in_(provider_by_ticker))
+        )})
+    for ticker, snapshot in provider_by_ticker.items():
+        sec = sec_by_ticker.get(ticker)
+        if sec is not None and snapshot.as_of_date <= sec[1]:
+            continue
+        mix = provider_mix.get(ticker, {})
+        fund = funds_by_ticker.get(ticker)
+        if not mix or fund is None:
+            continue
+        universe[ticker] = (fund, snapshot.as_of_date, mix, "tickerinside", snapshot.source_layer)
     return universe
 
 
@@ -71,8 +137,10 @@ def covered_etfs(session: Session = Depends(get_session)):
     """ETFs with holdings data, so their sector mix is known and they can be planned with."""
     return [
         {"ticker": ticker, "name": fund.name, "issuer": fund.issuer, "as_of_date": as_of,
+         "source_provider": source_provider, "source_layer": source_layer,
          "sample": fund.issuer == SAMPLE_ISSUER, "sectors": sector_list(mix)}
-        for ticker, (fund, as_of, mix) in sorted(latest_universe(session).items())
+        for ticker, (fund, as_of, mix, source_provider, source_layer)
+        in sorted(latest_universe(session).items())
     ]
 
 
@@ -84,7 +152,7 @@ def plan(body: PlanIn, session: Session = Depends(get_session)):
         ticker = h.ticker.strip().upper()
         amounts[ticker] = amounts.get(ticker, 0.0) + h.amount
     universe = latest_universe(session)
-    weights = {t: mix for t, (_, _, mix) in universe.items()}
+    weights = {t: data[2] for t, data in universe.items()}
     names = {f.ticker: f for f in session.scalars(select(Fund).where(Fund.ticker.in_(list(amounts))))}
     unknown = [t for t in amounts if t not in names]
     if unknown:
@@ -107,7 +175,7 @@ def plan(body: PlanIn, session: Session = Depends(get_session)):
 
     plans = []
     if target is not None:
-        never = [t for t, (fund, _, _) in universe.items() if fund.issuer == SAMPLE_ISSUER]
+        never = [t for t, (fund, _, _, _, _) in universe.items() if fund.issuer == SAMPLE_ISSUER]
         for p in build_plans(amounts, weights, target, body.cash_change, body.max_new_funds, never):
             plans.append({
                 "kind": p.kind, "title": p.title, "summary": p.summary,
@@ -124,6 +192,8 @@ def plan(body: PlanIn, session: Session = Depends(get_session)):
             {"ticker": t, "name": fund_name(t), "issuer": names[t].issuer, "amount": a,
              "status": "available" if t in universe else "missing",
              "as_of_date": universe[t][1] if t in universe else None,
+             "source_provider": universe[t][3] if t in universe else None,
+             "source_layer": universe[t][4] if t in universe else None,
              "sectors": sector_list(universe[t][2]) if t in universe else []}
             for t, a in amounts.items()
         ],

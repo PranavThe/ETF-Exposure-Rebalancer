@@ -10,7 +10,7 @@ from backend.analytics.sectors import resolve_sector
 from backend.analytics.simulation import simulate_portfolio
 
 from ..db import get_session
-from ..models import Fund, Holding, SecuritySector, Snapshot
+from ..models import Fund, Holding, ProviderHoldingsSnapshot, SecuritySector, Snapshot
 from ..schemas import (Changes, FundOut, HoldingsOut, SimulationOut, SimulationRequest,
                        SnapshotOut)
 
@@ -62,7 +62,13 @@ def list_funds(
     stats = (select(Snapshot.fund_id, func.count(Snapshot.id).label("n"),
                     func.max(Snapshot.as_of_date).label("latest"))
              .group_by(Snapshot.fund_id).subquery())
-    query = select(Fund, stats.c.n, stats.c.latest).outerjoin(stats, stats.c.fund_id == Fund.id)
+    provider_latest = (select(ProviderHoldingsSnapshot.fund_ticker,
+                              func.max(ProviderHoldingsSnapshot.as_of_date).label("latest"))
+                       .where(ProviderHoldingsSnapshot.provider == "tickerinside")
+                       .group_by(ProviderHoldingsSnapshot.fund_ticker).subquery())
+    query = (select(Fund, stats.c.n, stats.c.latest, provider_latest.c.latest)
+             .outerjoin(stats, stats.c.fund_id == Fund.id)
+             .outerjoin(provider_latest, provider_latest.c.fund_ticker == Fund.ticker))
     if loaded_only:
         query = query.where(stats.c.n > 0)
     query = query.order_by(Fund.ticker).offset(offset)
@@ -70,7 +76,8 @@ def list_funds(
         query = query.limit(limit)
     rows = session.execute(query)
     return [{"ticker": f.ticker, "name": f.name, "issuer": f.issuer, "snapshot_count": n or 0,
-             "latest_as_of_date": latest} for f, n, latest in rows]
+             "latest_as_of_date": latest, "provider_holdings_as_of_date": provider_date}
+            for f, n, latest, provider_date in rows]
 
 
 @router.get("/{ticker}", response_model=FundOut)
@@ -78,8 +85,13 @@ def get_fund(ticker: str, session: Session = Depends(get_session)):
     fund = fund_or_404(session, ticker)
     count, latest = session.execute(select(func.count(Snapshot.id), func.max(Snapshot.as_of_date))
                                     .where(Snapshot.fund_id == fund.id)).one()
+    provider_latest = session.scalar(select(func.max(ProviderHoldingsSnapshot.as_of_date)).where(
+        ProviderHoldingsSnapshot.provider == "tickerinside",
+        ProviderHoldingsSnapshot.fund_ticker == fund.ticker,
+    ))
     return {"ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer,
-            "snapshot_count": count, "latest_as_of_date": latest}
+            "snapshot_count": count, "latest_as_of_date": latest,
+            "provider_holdings_as_of_date": provider_latest}
 
 
 @router.get("/{ticker}/snapshots", response_model=list[SnapshotOut])

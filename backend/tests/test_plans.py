@@ -6,7 +6,8 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_engine
-from backend.app.models import Fund, Holding, Snapshot
+from backend.app.models import (Fund, Holding, ProviderHolding, ProviderHoldingsSnapshot,
+                                Snapshot)
 
 
 def close(a: float, b: float) -> bool:
@@ -24,7 +25,8 @@ def add_fund(ticker: str, sectors: dict[str, float], issuer: str = "Test Issuer"
         session.add(snapshot)
         session.flush()
         for i, (sector, value) in enumerate(sectors.items()):
-            session.add(Holding(snapshot_id=snapshot.id, security_id=f"{ticker}{i}", name=f"{ticker} {i}",
+            session.add(Holding(snapshot_id=snapshot.id, security_id=f"{ticker}{i}",
+                                ticker=f"{ticker}{i}", name=f"{ticker} {i}",
                                 asset_class="equity", source_sector=sector, shares=1, price=value,
                                 market_value=value))
 
@@ -43,6 +45,32 @@ def test_covered_lists_funds_with_holdings_and_flags_samples(client):
     assert by_ticker["TECHX"]["sectors"] == [{"sector": "Technology", "weight": 1.0}]
     for etf in body:
         assert close(sum(s["weight"] for s in etf["sectors"]), 1)
+
+
+def test_planner_uses_newer_tickerinside_weights_and_preserves_provenance(client):
+    add_fund("MIXED", {"Technology": 100})
+    with Session(get_engine()) as session, session.begin():
+        snapshot = ProviderHoldingsSnapshot(
+            provider="tickerinside", fund_ticker="MIXED", fund_name="Mixed Fund",
+            as_of_date=date(2026, 10, 17), source_layer="issuer", source_url="https://example.test",
+            cite_as="TickerInside", content_hash="provider-mixed",
+        )
+        session.add(snapshot)
+        session.flush()
+        session.add_all([
+            ProviderHolding(snapshot_id=snapshot.id, ticker="MIXED0", weight=0.75),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="UNSEEN", weight=0.25),
+        ])
+
+    covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
+    assert covered["MIXED"]["source_provider"] == "tickerinside"
+    assert covered["MIXED"]["as_of_date"] == "2026-10-17"
+    assert mix(covered["MIXED"]["sectors"]) == {"Technology": 0.75, "Unclassified": 0.25}
+
+    response = client.post("/plan", json={"holdings": [{"ticker": "MIXED", "amount": 1000}]})
+    fund_row = next(row for row in response.json()["funds"] if row["ticker"] == "MIXED")
+    assert fund_row["source_provider"] == "tickerinside"
+    assert fund_row["source_layer"] == "issuer"
 
 
 def test_plan_without_target_reports_current_mix(client):

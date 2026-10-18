@@ -14,7 +14,8 @@ from backend.analytics.sectors import resolve_sector
 from backend.analytics.portfolio import analyze_latest
 
 from ..db import get_session
-from ..models import Fund, Holding, Portfolio, PortfolioFund, Snapshot, utcnow
+from ..models import (Fund, Holding, Portfolio, PortfolioFund, ProviderHolding,
+                      ProviderHoldingsSnapshot, SecurityPrice, Snapshot, utcnow)
 from ..portfolio_schemas import PortfolioCreated, PortfolioIn, PortfolioLatest, PortfolioOut
 from .funds import sector_map, snapshot_meta
 
@@ -139,6 +140,7 @@ def latest_for_members(session: Session, portfolio_data: dict,
                        members: list[tuple[Fund, float]]) -> dict:
     """Build the latest-holdings analysis input for stored or hypothetical allocations."""
     fund_ids = [fund.id for fund, _ in members]
+    fund_tickers = [fund.ticker for fund, _ in members]
     snapshots_by_fund = {}
     holdings_by_snapshot = {}
     if fund_ids:
@@ -162,30 +164,114 @@ def latest_for_members(session: Session, portfolio_data: dict,
                 .order_by(Holding.snapshot_id, Holding.market_value.desc())
             ):
                 holdings_by_snapshot.setdefault(holding.snapshot_id, []).append(holding)
+
+    provider_by_fund = {}
+    provider_holdings = {}
+    if fund_tickers:
+        provider_snapshots = session.scalars(
+            select(ProviderHoldingsSnapshot)
+            .where(ProviderHoldingsSnapshot.provider == "tickerinside",
+                   ProviderHoldingsSnapshot.fund_ticker.in_(fund_tickers))
+            .order_by(ProviderHoldingsSnapshot.fund_ticker,
+                      ProviderHoldingsSnapshot.as_of_date.desc(),
+                      ProviderHoldingsSnapshot.fetched_at.desc())
+        )
+        for provider_snapshot in provider_snapshots:
+            provider_by_fund.setdefault(provider_snapshot.fund_ticker, provider_snapshot)
+        if provider_by_fund:
+            for holding in session.scalars(
+                select(ProviderHolding)
+                .where(ProviderHolding.snapshot_id.in_(s.id for s in provider_by_fund.values()))
+                .order_by(ProviderHolding.snapshot_id, ProviderHolding.weight.desc())
+            ):
+                provider_holdings.setdefault(holding.snapshot_id, []).append(holding)
+
     sectors = sector_map(session)
     latest_funds = []
     coverage_weight = 0.0
     for fund, weight in members:
         snapshot = snapshots_by_fund.get(fund.id)
-        holdings = holdings_by_snapshot.get(snapshot.id, []) if snapshot is not None else []
-        if snapshot is not None:
-            coverage_weight += weight
-        latest_funds.append({
-            "ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer,
-            "weight": weight,
-            "status": "available" if snapshot is not None else "missing",
-            "as_of_date": snapshot.as_of_date if snapshot is not None else None,
-            "snapshot": ({**snapshot_meta(snapshot), "ingested_at": snapshot.ingested_at}
-                         if snapshot is not None else None),
-            "holdings": [
+        provider_snapshot = provider_by_fund.get(fund.ticker)
+        use_provider = (provider_snapshot is not None
+                        and (snapshot is None or provider_snapshot.as_of_date > snapshot.as_of_date))
+        if use_provider:
+            provider_rows = provider_holdings.get(provider_snapshot.id, [])
+            holdings = [
+                {"security_id": f"TICKER:{row.ticker}", "ticker": row.ticker,
+                 "name": row.ticker, "asset_class": "equity", "source_sector": None,
+                 "sector": resolve_sector(f"TICKER:{row.ticker}", None, sectors),
+                 "shares": None, "price": None, "market_value": None,
+                 "reported_weight": row.weight}
+                for row in provider_rows
+            ]
+            source_provider = "tickerinside"
+            source_layer = provider_snapshot.source_layer
+            as_of_date = provider_snapshot.as_of_date
+            snapshot_data = {
+                "as_of_date": provider_snapshot.as_of_date,
+                "source_url": provider_snapshot.source_url,
+                "source_file": f"tickerinside:{fund.ticker}:{provider_snapshot.source_layer}",
+                "content_hash": provider_snapshot.content_hash,
+                "row_count": len(provider_rows),
+                "ingested_at": provider_snapshot.fetched_at,
+            }
+        else:
+            holdings = holdings_by_snapshot.get(snapshot.id, []) if snapshot is not None else []
+            source_provider = (
+                "sec" if snapshot is not None and "sec.gov" in snapshot.source_url.lower()
+                else "issuer" if snapshot is not None else None
+            )
+            source_layer = None
+            as_of_date = snapshot.as_of_date if snapshot is not None else None
+            snapshot_data = ({**snapshot_meta(snapshot), "ingested_at": snapshot.ingested_at}
+                             if snapshot is not None else None)
+            holdings = [
                 {"security_id": h.security_id, "ticker": h.ticker, "name": h.name,
                  "asset_class": h.asset_class, "source_sector": h.source_sector,
                  "sector": resolve_sector(h.security_id, h.source_sector, sectors),
                  "shares": h.shares, "price": h.price, "market_value": h.market_value,
                  "reported_weight": h.reported_weight}
                 for h in holdings
-            ],
+            ]
+        if snapshot is not None or use_provider:
+            coverage_weight += weight
+        latest_funds.append({
+            "ticker": fund.ticker, "name": fund.name, "issuer": fund.issuer,
+            "weight": weight,
+            "status": "available" if (snapshot is not None or use_provider) else "missing",
+            "as_of_date": as_of_date,
+            "source_provider": source_provider,
+            "source_layer": source_layer,
+            "snapshot": snapshot_data,
+            "holdings": holdings,
         })
+
+    symbols = {holding["ticker"] for fund in latest_funds for holding in fund["holdings"]
+               if holding["ticker"]}
+    prices_by_ticker = {}
+    if symbols:
+        latest_price_dates = (
+            select(SecurityPrice.ticker, func.max(SecurityPrice.as_of_date).label("as_of_date"))
+            .where(SecurityPrice.provider == "alpaca", SecurityPrice.feed == "iex",
+                   SecurityPrice.adjustment == "all", SecurityPrice.ticker.in_(symbols))
+            .group_by(SecurityPrice.ticker)
+            .subquery()
+        )
+        for price in session.scalars(
+            select(SecurityPrice).join(
+                latest_price_dates,
+                (SecurityPrice.ticker == latest_price_dates.c.ticker)
+                & (SecurityPrice.as_of_date == latest_price_dates.c.as_of_date),
+            ).where(SecurityPrice.provider == "alpaca", SecurityPrice.feed == "iex",
+                    SecurityPrice.adjustment == "all")
+        ):
+            prices_by_ticker[price.ticker] = price
+    for fund in latest_funds:
+        for holding in fund["holdings"]:
+            price = prices_by_ticker.get(holding["ticker"])
+            holding["latest_price"] = price.close if price is not None else None
+            holding["latest_price_as_of_date"] = price.as_of_date if price is not None else None
+
     return {"portfolio": portfolio_data,
             "coverage_weight": coverage_weight, "funds": latest_funds}
 

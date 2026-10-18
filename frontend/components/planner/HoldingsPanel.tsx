@@ -1,6 +1,7 @@
 "use client";
 
 import Panel from "@/components/ui/Panel";
+import type { ProviderHoldingChanges, ProviderPrice } from "@/lib/api";
 import { pct } from "@/lib/format";
 import { usd, type CoveredEtf, type Holding, type PlanFund } from "@/lib/planner";
 
@@ -12,6 +13,8 @@ export default function HoldingsPanel({
   holdings,
   funds,
   covered,
+  providerData,
+  prices,
   onAmount,
   onRemove,
   onAdd,
@@ -20,6 +23,8 @@ export default function HoldingsPanel({
   holdings: Holding[];
   funds: Map<string, PlanFund>;
   covered: CoveredEtf[];
+  providerData: Map<string, ProviderHoldingChanges>;
+  prices: Map<string, ProviderPrice>;
   onAmount: (ticker: string, amount: number) => void;
   onRemove: (ticker: string) => void;
   onAdd: (etf: { ticker: string; name: string }) => void;
@@ -61,6 +66,7 @@ export default function HoldingsPanel({
           {holdings.map((h) => {
             const fund = funds.get(h.ticker);
             const noData = fund?.status === "missing";
+            const provider = providerData.get(h.ticker);
             return (
               <li key={h.ticker} className="px-3 py-2.5">
                 <div className="flex items-center gap-2">
@@ -85,7 +91,38 @@ export default function HoldingsPanel({
                   <p className="mt-1 text-[11px] text-faint">No holdings data yet, so it isn’t counted in your mix.</p>
                 )}
                 {fund?.as_of_date && (
-                  <p className="mt-1 font-mono text-[10px] text-faint">holdings as of {fund.as_of_date}</p>
+                  <p className="mt-1 font-mono text-[10px] text-faint">
+                    {fund.source_provider === "tickerinside" ? "TickerInside" : fund.source_provider === "sec" ? "SEC N-PORT" : "Issuer file"}
+                    {fund.source_layer ? ` · ${fund.source_layer}` : ""} · holdings as of {fund.as_of_date}
+                  </p>
+                )}
+                {provider && (
+                  <details className="mt-1.5 rounded border border-line px-2 py-1.5 text-[10px] text-muted">
+                    <summary className="cursor-pointer">
+                      TickerInside holdings · {provider.snapshot.as_of_date}
+                      {provider.previous_as_of_date && ` · ${provider.no_longer_reported.length} no longer reported`}
+                    </summary>
+                    <ul className="mt-1.5 space-y-1">
+                      {provider.holdings.slice(0, 5).map((item) => {
+                        const price = prices.get(item.ticker);
+                        return (
+                          <li key={item.ticker} className="flex justify-between gap-2 font-mono">
+                            <span>{item.ticker} · {pct(item.weight, 1)}</span>
+                            <span className="text-faint">
+                              {price ? `$${price.close.toFixed(2)} · IEX ${price.as_of_date}` : "IEX price pending"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {provider.no_longer_reported.length > 0 && (
+                      <p className="mt-1.5">
+                        No longer reported: {provider.no_longer_reported.slice(0, 5).map((item) => item.ticker).join(", ")}
+                        {provider.no_longer_reported.length > 5 ? " …" : ""}. A reporting change does not prove a sale.
+                      </p>
+                    )}
+                    <p className="mt-1.5">TickerInside reports weights; Alpaca prices use the IEX feed. Reporting differences do not prove trades.</p>
+                  </details>
                 )}
               </li>
             );

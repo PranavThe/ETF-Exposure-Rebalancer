@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Fund } from "@/lib/api";
 import { planner, type CoveredEtf } from "@/lib/planner";
 
-type Option = { ticker: string; name: string; covered: boolean };
+type Option = { ticker: string; name: string; covered: boolean; source?: string; asOf?: string };
 
 /** Search every listed ETF; ETFs with sector data come first. */
 export default function EtfPicker({
@@ -42,12 +42,16 @@ export default function EtfPicker({
     const withData = covered
       .filter((e) => !e.sample && (!q || e.ticker.toLowerCase().includes(q) || e.name.toLowerCase().includes(q)))
       .sort((a, b) => Number(b.ticker.toLowerCase() === q) - Number(a.ticker.toLowerCase() === q))
-      .map((e) => ({ ticker: e.ticker, name: e.name, covered: true }));
+      .map((e) => ({ ticker: e.ticker, name: e.name, covered: true,
+        source: e.source_provider === "tickerinside" ? "TickerInside" : "SEC / issuer",
+        asOf: e.as_of_date }));
     const seen = new Set(withData.map((o) => o.ticker));
     const rest = (found?.term === term ? found.funds : [])
       .filter((f) => !seen.has(f.ticker))
       .sort((a, b) => Number(b.ticker.toLowerCase() === q) - Number(a.ticker.toLowerCase() === q))
-      .map((f) => ({ ticker: f.ticker, name: f.name, covered: false }));
+      .map((f) => ({ ticker: f.ticker, name: f.name, covered: false,
+        source: f.provider_holdings_as_of_date ? "TickerInside" : undefined,
+        asOf: f.provider_holdings_as_of_date ?? f.latest_as_of_date ?? undefined }));
     return [...withData, ...rest].filter((o) => !exclude.has(o.ticker)).slice(0, 30);
   }, [covered, found, term, exclude]);
   const searching = Boolean(term) && found?.term !== term;
@@ -84,7 +88,7 @@ export default function EtfPicker({
           role="listbox"
           className="absolute inset-x-0 top-10 z-30 max-h-72 overflow-auto rounded-md border border-line-2 bg-panel-2 py-1 shadow-xl"
         >
-          {!term && <li className="label px-3 pb-1 pt-1.5">ETFs with sector data</li>}
+          {!term && <li className="label px-3 pb-1 pt-1.5">ETFs with holdings data</li>}
           {options.map((o) => (
             <li key={o.ticker} role="option" aria-selected={false}>
               <button
@@ -96,7 +100,7 @@ export default function EtfPicker({
                 <span className="w-14 shrink-0 font-mono font-semibold">{o.ticker}</span>
                 <span className="min-w-0 flex-1 truncate text-muted">{o.name}</span>
                 <span className={`shrink-0 font-mono text-[10px] ${o.covered ? "text-up" : "text-faint"}`}>
-                  {o.covered ? "sector data" : "no data yet"}
+                  {o.covered ? `${o.source} · ${o.asOf}` : o.source ? `${o.source} · ${o.asOf}` : "no data yet"}
                 </span>
               </button>
             </li>

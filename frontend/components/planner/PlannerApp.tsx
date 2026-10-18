@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { api, type ProviderHoldingChanges, type ProviderPrice } from "@/lib/api";
 import {
   forgetLast,
   loadPortfolio,
@@ -46,6 +47,8 @@ function setUrl(id: string | null) {
 export default function PlannerApp() {
   const requested = useSearchParams().get("p");
   const [covered, setCovered] = useState<CoveredEtf[]>([]);
+  const [providerData, setProviderData] = useState<Map<string, ProviderHoldingChanges>>(() => new Map());
+  const [prices, setPrices] = useState<Map<string, ProviderPrice>>(() => new Map());
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [target, setTarget] = useState<Mix | null>(null);
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -71,6 +74,41 @@ export default function PlannerApp() {
   useEffect(() => {
     planner.covered().then(setCovered, () => setCovered([]));
   }, []);
+
+  const providerTickers = useMemo(() => {
+    const providerFunds = new Set((result?.funds ?? [])
+      .filter((fund) => fund.source_provider === "tickerinside")
+      .map((fund) => fund.ticker));
+    return holdings.map((holding) => holding.ticker).filter((ticker) => providerFunds.has(ticker));
+  }, [holdings, result]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (providerTickers.length === 0) {
+      setProviderData(new Map());
+      setPrices(new Map());
+      return () => controller.abort();
+    }
+    Promise.all(providerTickers.map((ticker) =>
+      api.providerHoldingChanges(ticker, controller.signal).catch(() => null),
+    )).then(async (rows) => {
+      if (controller.signal.aborted) return;
+      const byFund = new Map<string, ProviderHoldingChanges>();
+      for (const row of rows) if (row) byFund.set(row.fund, row);
+      const symbols = [...new Set(rows.flatMap((row) => row?.holdings.slice(0, 5).map((item) => item.ticker) ?? []))];
+      setProviderData(byFund);
+      if (symbols.length === 0) {
+        setPrices(new Map());
+        return;
+      }
+      const responses = await Promise.all(Array.from({ length: Math.ceil(symbols.length / 500) }, (_, index) =>
+        api.providerPrices(symbols.slice(index * 500, (index + 1) * 500), controller.signal).catch(() => null),
+      ));
+      if (controller.signal.aborted) return;
+      setPrices(new Map(responses.flatMap((response) => response?.prices ?? []).map((price) => [price.ticker, price])));
+    });
+    return () => controller.abort();
+  }, [providerTickers]);
   useEffect(() => {
     if (requested && requested === savedId.current) return; // we just saved it: already on screen
     const place = rememberedPortfolio(requested);
@@ -314,6 +352,8 @@ export default function PlannerApp() {
           holdings={holdings}
           funds={funds}
           covered={covered}
+          providerData={providerData}
+          prices={prices}
           onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
           onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
           onAdd={addEtf}
