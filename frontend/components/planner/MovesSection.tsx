@@ -35,6 +35,7 @@ export default function MovesSection({
   onApply,
   request,
   dataDates,
+  onFocusChange,
   logo = (ticker: string) => <Monogram ticker={ticker} size={26} />,
 }: {
   plans: Plan[];
@@ -49,12 +50,16 @@ export default function MovesSection({
   onApply: (plan: Plan) => void;
   request: PlanRequest;
   dataDates: string | null;
+  onFocusChange?: (focused: boolean) => void; // the explanation or the limits list is open
   logo?: (ticker: string, name: string) => React.ReactNode;
 }) {
   const plan = plans[Math.min(active, plans.length - 1)];
   const [explained, setExplained] = useState<{ key: string; data?: PlanExplanation; error?: string } | null>(null);
   const key = plan ? JSON.stringify([request, plan.kind]) : "";
   const explanation = explained?.key === key ? explained : null;
+  const [limitsOpen, setLimitsOpen] = useState(false);
+  const focused = Boolean(explanation) || limitsOpen;
+  useEffect(() => onFocusChange?.(focused), [focused, onFocusChange]);
 
   function explain() {
     if (!plan) return;
@@ -184,7 +189,7 @@ export default function MovesSection({
           </div>
         )}
         {explanation && <PlanWhy state={explanation} plan={plan} onClose={() => setExplained(null)} />}
-        <BeforeYouAct dataDates={dataDates} />
+        <BeforeYouAct dataDates={dataDates} onToggle={setLimitsOpen} />
       </div>
     </section>
   );
@@ -253,9 +258,9 @@ function PlanWhy({ state, plan, onClose }: { state: { data?: PlanExplanation; er
 }
 
 /** The limits of the plan, always one click away. */
-function BeforeYouAct({ dataDates }: { dataDates: string | null }) {
+function BeforeYouAct({ dataDates, onToggle }: { dataDates: string | null; onToggle: (open: boolean) => void }) {
   return (
-    <details className="group mt-4 border-t border-line pt-3 text-[12.5px] text-muted">
+    <details onToggle={(e) => onToggle(e.currentTarget.open)} className="group mt-4 border-t border-line pt-3 text-[12.5px] text-muted">
       <summary className="flex cursor-pointer list-none items-center gap-2 text-[12.5px] text-muted transition-colors hover:text-fg [&::-webkit-details-marker]:hidden">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="text-activity">
           <path d="M12 9v4M12 17h.01" />

@@ -65,6 +65,7 @@ export default function PlannerApp() {
   const [result, setResult] = useState<PlanResult | null>(null);
   const [companies, setCompanies] = useState<Companies | null>(null);
   const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [movesFocus, setMovesFocus] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [planning, setPlanning] = useState(false);
   const [activePlan, setActivePlan] = useState(0);
@@ -656,7 +657,8 @@ export default function PlannerApp() {
             />
           </div>
           <div className="flex min-w-0 flex-col divide-y divide-line border-b border-line [grid-area:main] md:border-b-0 xl:min-h-0">
-            <div className="flex flex-col xl:min-h-0 xl:flex-[3]">
+            {/* The moves get most of the column while their explanation or limits list is open. */}
+            <div className="flex flex-col transition-[flex-grow] duration-500 ease-out xl:min-h-0 xl:flex-1 xl:basis-0" style={{ flexGrow: movesFocus ? 1.15 : 3 }}>
               <MixSection
                 current={current}
                 target={target}
@@ -670,7 +672,7 @@ export default function PlannerApp() {
                 onReset={resetTarget}
               />
             </div>
-            <div className="flex flex-col xl:min-h-0 xl:flex-[2]">
+            <div className="flex flex-col transition-[flex-grow] duration-500 ease-out xl:min-h-0 xl:flex-1 xl:basis-0" style={{ flexGrow: movesFocus ? 2.85 : 2 }}>
               <MovesSection
                 plans={plans}
                 active={activePlan}
@@ -684,6 +686,7 @@ export default function PlannerApp() {
                 onApply={applyPlan}
                 request={request}
                 dataDates={dataDates}
+                onFocusChange={setMovesFocus}
               />
             </div>
           </div>
