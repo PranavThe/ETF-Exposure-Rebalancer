@@ -1,16 +1,19 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type ProviderHoldingChanges, type ProviderPrice } from "@/lib/api";
 
 import {
-  forgetLast,
+  createPortfolio,
   loadPortfolio,
   mixDistance,
   planner,
+  persistPortfolioTabs,
   rememberedPortfolio,
+  renamePortfolio,
+  restorePortfolioTabs,
   savePortfolio,
   setSector,
   targetFrom,
@@ -21,11 +24,14 @@ import {
   type Mix,
   type Plan,
   type PlanResult,
+  type PortfolioTab,
+  type SavedPortfolio,
 } from "@/lib/planner";
 
 import HoldingsSection from "./HoldingsSection";
 import MixSection from "./MixSection";
 import MovesSection from "./MovesSection";
+import PortfolioTabs from "./PortfolioTabs";
 import ScytheSection from "./ScytheSection";
 import StatusBar from "./StatusBar";
 import TopBar from "./TopBar";
@@ -37,7 +43,6 @@ const EXAMPLE = [
   { ticker: "ARKK", name: "ARK Innovation ETF", amount: 1000 },
 ];
 
-type Saved = { id: string; key: string | null };
 type SaveState = "idle" | "pending" | "saving" | "saved" | "error";
 
 function setUrl(id: string | null) {
@@ -50,6 +55,7 @@ function setUrl(id: string | null) {
 /** The whole app: your ETFs, your sector mix against the mix you want, and the moves to get there. */
 export default function PlannerApp() {
   const requested = useSearchParams().get("p");
+  const [initialRequested] = useState(requested);
   const [covered, setCovered] = useState<CoveredEtf[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [target, setTarget] = useState<Mix | null>(null);
@@ -62,7 +68,12 @@ export default function PlannerApp() {
   const [turns, setTurns] = useState<(ChatTurn & { note?: string })[]>([]);
   const [chatBusy, setChatBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [saved, setSaved] = useState<Saved | null>(null);
+  const [saved, setSaved] = useState<SavedPortfolio | null>(null);
+  const [portfolioName, setPortfolioName] = useState("My ETFs");
+  const [tabs, setTabs] = useState<PortfolioTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [tabsReady, setTabsReady] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [flash, setFlash] = useState<Set<string>>(new Set());
@@ -73,42 +84,55 @@ export default function PlannerApp() {
   const [prices, setPrices] = useState<Map<string, ProviderPrice>>(() => new Map());
   const dirty = useRef(false);
   const savedId = useRef<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlight = useRef<Promise<void> | null>(null);
+  const chatController = useRef<AbortController | null>(null);
 
 
-  // Load the ETFs we have data for, and the saved portfolio (from ?p= or this browser).
+  // Restore this browser's open tabs and load its active portfolio on startup.
   useEffect(() => {
     planner.covered().then(setCovered, () => setCovered([]));
   }, []);
   useEffect(() => {
-    if (requested && requested === savedId.current) return; // we just saved it: already on screen
-    const place = rememberedPortfolio(requested);
-    if (!place) {
-      Promise.resolve().then(() => setReady(true));
+    const restored = restorePortfolioTabs(initialRequested);
+    setTabs(restored.tabs);
+    setActiveTabId(restored.activeId);
+    setTabsReady(true);
+    if (!restored.activeId) {
+      setReady(true);
       return;
     }
+    const place = rememberedPortfolio(restored.activeId) ?? { id: restored.activeId, key: null };
     let active = true;
     loadPortfolio(place.id).then(
       (p) => {
         if (!active) return;
         setHoldings(p.holdings);
         setTarget(p.target);
+        setPortfolioName(p.name);
         savedId.current = place.id;
         setSaved(place);
+        setTabs((current) => current.map((tab) => tab.id === place.id
+          ? { ...tab, name: p.name, key: place.key }
+          : tab));
         setSaveState("saved");
         setUrl(place.id);
         setReady(true);
       },
       () => {
         if (!active) return;
-        if (requested) toast("Couldn’t open that saved portfolio. The link may be wrong or deleted.", "error");
-        else forgetLast();
+        toast("Couldn’t open that saved portfolio. The link may be wrong or deleted.", "error");
         setReady(true);
       },
     );
     return () => {
       active = false;
     };
-  }, [requested]);
+  }, [initialRequested]);
+
+  useEffect(() => {
+    if (tabsReady) persistPortfolioTabs(tabs, activeTabId);
+  }, [tabs, activeTabId, tabsReady]);
 
   // Ask the planner whenever the inputs change.
   const request = useMemo(
@@ -166,29 +190,65 @@ export default function PlannerApp() {
     return () => controller.abort();
   }, [providerTickers]);
 
-  // Save to the database a moment after the user stops editing.
+  const persistCurrent = useCallback(async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    if (saveInFlight.current) await saveInFlight.current;
+    if (!dirty.current) return;
+    if (!saved && holdings.length === 0) {
+      dirty.current = false;
+      return;
+    }
+
+    dirty.current = false;
+    setSaveState("saving");
+    const priorId = saved?.id ?? null;
+    const pending = savePortfolio(saved, holdings, target, portfolioName).then(({ place, addedFunds }) => {
+      savedId.current = place.id;
+      setSaved(place);
+      setPortfolioName(portfolioName);
+      setActiveTabId(place.id);
+      setUrl(place.id);
+      setTabs((current) => {
+        const index = priorId ? current.findIndex((tab) => tab.id === priorId) : -1;
+        if (index >= 0) {
+          return current.map((tab, i) => i === index ? { ...tab, id: place.id, name: portfolioName, key: place.key } : tab);
+        }
+        const existing = current.find((tab) => tab.id === place.id);
+        return existing
+          ? current.map((tab) => tab.id === place.id ? { ...tab, name: portfolioName, key: place.key } : tab)
+          : [...current, { id: place.id, name: portfolioName, key: place.key }];
+      });
+      setSaveState("saved");
+      if (addedFunds) setPlanRefresh((version) => version + 1);
+    }).catch((error: unknown) => {
+      dirty.current = true;
+      setSaveState("error");
+      throw error;
+    });
+    saveInFlight.current = pending;
+    try {
+      await pending;
+    } finally {
+      if (saveInFlight.current === pending) saveInFlight.current = null;
+    }
+  }, [saved, holdings, target, portfolioName]);
+
+  // Save automatically after edits, and synchronously before changing tabs.
   useEffect(() => {
     if (!ready || !dirty.current) return;
     if (!saved && holdings.length === 0) return;
-    const timer = setTimeout(() => {
-      dirty.current = false; // edits made while saving set it again
-      setSaveState("saving");
-      savePortfolio(saved, holdings, target).then(
-        ({ place, addedFunds }) => {
-          savedId.current = place.id;
-          setSaved(place);
-          setUrl(place.id);
-          setSaveState("saved");
-          if (addedFunds) setPlanRefresh((version) => version + 1);
-        },
-        () => {
-          dirty.current = true;
-          setSaveState("error");
-        },
-      );
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      void persistCurrent().catch(() => undefined);
     }, 1200);
-    return () => clearTimeout(timer);
-  }, [holdings, target, saved, ready]);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    };
+  }, [holdings, target, saved, portfolioName, ready, persistCurrent]);
 
   function markDirty() {
     dirty.current = true;
@@ -266,6 +326,8 @@ export default function PlannerApp() {
   }
 
   async function sendChat(message: string) {
+    const controller = new AbortController();
+    chatController.current = controller;
     const history = turns.slice(-10).map(({ role, content }) => ({ role, content }));
     setTurns((t) => [...t, { role: "user", content: message }]);
     setChatBusy(true);
@@ -276,7 +338,8 @@ export default function PlannerApp() {
         current,
         target,
         total: result?.covered_total ?? 0,
-      });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
       if (reply.target) {
         markDirty();
         setTarget(reply.target);
@@ -289,10 +352,20 @@ export default function PlannerApp() {
       ]);
       if (reply.target) toast("Target updated", "info");
     } catch (err) {
+      if (controller.signal.aborted) return;
       setTurns((t) => [...t, { role: "assistant", content: `Sorry, that didn’t go through. ${(err as Error).message}` }]);
     } finally {
-      setChatBusy(false);
+      if (chatController.current === controller) {
+        chatController.current = null;
+        setChatBusy(false);
+      }
     }
+  }
+
+  function cancelPendingChat() {
+    chatController.current?.abort();
+    chatController.current = null;
+    setChatBusy(false);
   }
 
   async function copyLink() {
@@ -304,18 +377,162 @@ export default function PlannerApp() {
     }
   }
 
-  function startOver() {
-    forgetLast();
-    setUrl(null);
+  function showLoadedPortfolio(id: string, data: Awaited<ReturnType<typeof loadPortfolio>>) {
+    const place = rememberedPortfolio(id) ?? { id, key: null };
+    savedId.current = id;
     dirty.current = false;
-    savedId.current = null;
-    setSaved(null);
-    setSaveState("idle");
-    setHoldings([]);
-    setTarget(null);
+    setActiveTabId(id);
+    setSaved(place);
+    setPortfolioName(data.name);
+    setHoldings(data.holdings);
+    setTarget(data.target);
     setTouched(new Set());
+    setMaxNew(2);
+    setResult(null);
+    setPlanError(null);
+    setPlanning(false);
+    setActivePlan(0);
     setTurns([]);
-    toast("Cleared. Start a new portfolio.", "info");
+    setConnected(null);
+    setProviderData(new Map());
+    setPrices(new Map());
+    setSaveState("saved");
+    setTabs((current) => current.map((tab) => tab.id === id
+      ? { ...tab, name: data.name, key: place.key }
+      : tab));
+    setUrl(id);
+    setReady(true);
+  }
+
+  async function selectTab(id: string) {
+    if (id === activeTabId || switching) return;
+    cancelPendingChat();
+    setSwitching(true);
+    try {
+      await persistCurrent();
+      setReady(false);
+      const data = await loadPortfolio(id);
+      showLoadedPortfolio(id, data);
+    } catch {
+      setReady(true);
+      toast("Couldn’t save or open that portfolio. Your current tab is still open.", "error");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  async function newPortfolio() {
+    if (switching) return;
+    cancelPendingChat();
+    setSwitching(true);
+    try {
+      await persistCurrent();
+      const names = new Set(tabs.map((tab) => tab.name));
+      let number = 1;
+      while (names.has(`Portfolio ${number}`)) number += 1;
+      const name = `Portfolio ${number}`;
+      const place = await createPortfolio(name);
+      const tab = { ...place, name };
+      dirty.current = false;
+      savedId.current = place.id;
+      setTabs((current) => [...current, tab]);
+      setActiveTabId(place.id);
+      setSaved(place);
+      setPortfolioName(name);
+      setHoldings([]);
+      setTarget(null);
+      setTouched(new Set());
+      setMaxNew(2);
+      setResult(null);
+      setPlanError(null);
+      setActivePlan(0);
+      setTurns([]);
+      setConnected(null);
+      setProviderData(new Map());
+      setPrices(new Map());
+      setSaveState("saved");
+      setUrl(place.id);
+      setReady(true);
+    } catch {
+      toast("Couldn’t create a new portfolio. Please try again.", "error");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  async function closeTab(id: string) {
+    if (switching) return;
+    const index = tabs.findIndex((tab) => tab.id === id);
+    if (index < 0) return;
+    const remaining = tabs.filter((tab) => tab.id !== id);
+    if (id !== activeTabId) {
+      setTabs(remaining);
+      return;
+    }
+
+    cancelPendingChat();
+    setSwitching(true);
+    try {
+      await persistCurrent();
+      const next = remaining[index] ?? remaining[index - 1] ?? null;
+      if (next) {
+        setReady(false);
+        const data = await loadPortfolio(next.id);
+        setTabs(remaining);
+        showLoadedPortfolio(next.id, data);
+      } else {
+        setTabs([]);
+        setActiveTabId(null);
+        savedId.current = null;
+        dirty.current = false;
+        setSaved(null);
+        setPortfolioName("My ETFs");
+        setHoldings([]);
+        setTarget(null);
+        setTouched(new Set());
+        setMaxNew(2);
+        setResult(null);
+        setPlanError(null);
+        setActivePlan(0);
+        setTurns([]);
+        setConnected(null);
+        setProviderData(new Map());
+        setPrices(new Map());
+        setSaveState("idle");
+        setUrl(null);
+        setReady(true);
+      }
+    } catch {
+      setReady(true);
+      toast("Couldn’t save or open the next portfolio. The current tab is still open.", "error");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  async function renameTab(id: string, name: string) {
+    const tab = tabs.find((item) => item.id === id);
+    if (!tab?.key) return;
+    try {
+      if (id === activeTabId) await persistCurrent();
+      await renamePortfolio({ id, key: tab.key }, name);
+      setTabs((current) => current.map((item) => item.id === id ? { ...item, name } : item));
+      if (id === activeTabId) setPortfolioName(name);
+    } catch {
+      toast("Couldn’t rename this portfolio. Please try again.", "error");
+    }
+  }
+
+  function moveTab(id: string, beforeId: string) {
+    setTabs((current) => {
+      const from = current.findIndex((tab) => tab.id === id);
+      const to = current.findIndex((tab) => tab.id === beforeId);
+      if (from < 0 || to < 0 || from === to) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   }
 
   const match = distance === null ? null : 1 - distance;
@@ -323,7 +540,7 @@ export default function PlannerApp() {
   const held = useMemo(() => new Set(holdings.map((h) => h.ticker)), [holdings]);
 
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-[1920px] flex-col bg-canvas min-[1922px]:border-x min-[1922px]:border-line">
+    <div className="relative mx-auto flex h-dvh w-full max-w-[1920px] flex-col bg-canvas min-[1922px]:border-x min-[1922px]:border-line">
       <TopBar
         covered={covered}
         held={held}
@@ -333,11 +550,20 @@ export default function PlannerApp() {
         owner={Boolean(saved?.key)}
         canShare={Boolean(saved)}
         onShare={copyLink}
-        onReset={holdings.length > 0 || saved ? startOver : null}
+      />
+      <PortfolioTabs
+        tabs={tabs}
+        activeId={activeTabId}
+        disabled={switching}
+        onSelect={(id) => void selectTab(id)}
+        onCreate={() => void newPortfolio()}
+        onClose={(id) => void closeTab(id)}
+        onRename={renameTab}
+        onMove={moveTab}
       />
       {/* Phones: one column. 768-1279px: holdings and Scythe on the left, mix and moves on the right.
           From 1280px: three columns that fill the window, scrolling as a page when it is too short. */}
-      <main className="min-h-0 flex-1 overflow-auto">
+      <main id="planner-portfolio-panel" className="min-h-0 flex-1 overflow-auto" aria-busy={switching}>
         <div className="grid grid-cols-1 [grid-template-areas:'holdings'_'main'_'scythe'] md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] md:grid-rows-[auto_1fr] md:[grid-template-areas:'holdings_main'_'scythe_main'] xl:h-full xl:min-h-[680px] xl:grid-cols-[272px_minmax(0,1fr)_336px] xl:grid-rows-1 xl:[grid-template-areas:'holdings_main_scythe'] 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
           <div className="border-b border-line [grid-area:holdings] md:border-r xl:flex xl:min-h-0 xl:flex-col xl:border-b-0">
             <HoldingsSection
@@ -390,6 +616,11 @@ export default function PlannerApp() {
       </main>
       <StatusBar />
       <Toasts toasts={toasts} />
+      {switching && (
+        <div role="status" className="absolute inset-0 z-50 flex items-center justify-center bg-canvas/55 backdrop-blur-[1px]">
+          <span className="rounded-lg border border-line-2 bg-panel px-4 py-3 text-sm text-fg shadow-xl">Switching portfolio…</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -58,6 +58,38 @@ def test_portfolio_create_update_analysis_and_delete(client):
     assert client.get(path).status_code == 404
 
 
+def test_empty_portfolio_can_be_renamed_without_changing_its_data(client):
+    created = client.post("/portfolios", json={"name": "Portfolio 2", "funds": []})
+    assert created.status_code == 201
+    body = created.json()
+    assert body["funds"] == []
+    path = f"/portfolios/{body['id']}"
+    key = body["edit_key"]
+    assert client.get(path).json()["funds"] == []
+
+    # Give the portfolio data as if it had been edited before the rename.
+    updated = client.put(path, headers={"X-Portfolio-Edit-Key": key}, json={
+        "name": "Portfolio 2",
+        "funds": [{"ticker": "DEMO", "weight": 1.0}],
+    })
+    assert updated.status_code == 200
+    prefs_path = f"/portfolios/{body['id']}/preferences"
+    prefs = {"total_value": 2500, "target": {"Technology": 0.7, "Cash & other": 0.3}}
+    assert client.put(prefs_path, headers={"X-Portfolio-Edit-Key": key}, json=prefs).status_code == 200
+
+    assert client.patch(path, json={"name": "Renamed"}).status_code == 403
+    assert client.patch(path, headers={"X-Portfolio-Edit-Key": "wrong"},
+                        json={"name": "Renamed"}).status_code == 403
+    renamed = client.patch(path, headers={"X-Portfolio-Edit-Key": key},
+                           json={"name": "  Renamed  "})
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "Renamed"
+    assert renamed.json()["funds"] == updated.json()["funds"]
+    assert client.get(prefs_path).json() == prefs
+    assert client.patch(path, headers={"X-Portfolio-Edit-Key": key},
+                        json={"name": "   "}).status_code == 422
+
+
 def test_overlap_uses_exact_security_identity():
     latest = {"portfolio": {"id": "x"}, "coverage_weight": 1, "funds": [
         {"ticker": "AAA", "name": "A", "issuer": "", "weight": 0.5,

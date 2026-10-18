@@ -21,6 +21,12 @@ class PortfolioIn(BaseModel):
     funds: list[PortfolioAllocationIn] = Field(default_factory=list, max_length=50)
 
 
+class PortfolioNameIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=100)
+
+
 class PortfolioAllocationOut(BaseModel):
     ticker: str
     name: str

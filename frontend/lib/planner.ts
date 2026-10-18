@@ -176,16 +176,19 @@ export const planner = {
   search: (q: string, signal?: AbortSignal): Promise<Fund[]> => api.searchEtfs(q, signal),
   plan: (body: PlanRequest, signal?: AbortSignal) =>
     call<PlanResult>("/plan", { method: "POST", body: JSON.stringify(body), signal }),
-  chat: (body: { message: string; history: ChatTurn[]; current: Mix; target: Mix | null; total: number }) =>
-    call<ChatReply>("/chat", { method: "POST", body: JSON.stringify(body) }),
+  chat: (body: { message: string; history: ChatTurn[]; current: Mix; target: Mix | null; total: number }, signal?: AbortSignal) =>
+    call<ChatReply>("/chat", { method: "POST", body: JSON.stringify(body), signal }),
 };
 
 // ---- Saving: an anonymous portfolio (weights) plus its dollar value and target ---------------
 
-type Saved = { id: string; key: string | null };
-export type PortfolioSaveResult = { place: Saved; addedFunds: boolean };
+export type SavedPortfolio = { id: string; key: string | null };
+export type PortfolioTab = { id: string; name: string; key: string | null };
+export type PortfolioSaveResult = { place: SavedPortfolio; addedFunds: boolean };
 const KEYS = "planner:edit-keys";
 const LAST = "planner:last";
+const TABS = "planner:tabs";
+const ACTIVE = "planner:active";
 
 function readKeys(): Record<string, string> {
   try {
@@ -195,13 +198,54 @@ function readKeys(): Record<string, string> {
   }
 }
 
-export function rememberedPortfolio(requested: string | null): Saved | null {
+export function rememberedPortfolio(requested: string | null): SavedPortfolio | null {
   try {
     const id = requested ?? localStorage.getItem(LAST);
     if (!id) return null;
     return { id, key: readKeys()[id] ?? null };
   } catch {
     return requested ? { id: requested, key: null } : null;
+  }
+}
+
+/** Restore this browser's open portfolio tabs, migrating the previous single-portfolio key. */
+export function restorePortfolioTabs(requested: string | null): { tabs: PortfolioTab[]; activeId: string | null } {
+  try {
+    const stored = JSON.parse(localStorage.getItem(TABS) ?? "[]") as unknown;
+    const tabs: PortfolioTab[] = Array.isArray(stored)
+      ? stored.flatMap((item): PortfolioTab[] => {
+          if (!item || typeof item.id !== "string" || !item.id) return [];
+          const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Portfolio";
+          return [{ id: item.id, name, key: readKeys()[item.id] ?? null }];
+        })
+      : [];
+    const requestedId = requested || localStorage.getItem(ACTIVE) || localStorage.getItem(LAST);
+    if (requestedId && !tabs.some((tab) => tab.id === requestedId)) {
+      tabs.push({ id: requestedId, name: "Portfolio", key: readKeys()[requestedId] ?? null });
+    }
+    const activeId = requestedId && tabs.some((tab) => tab.id === requestedId)
+      ? requestedId
+      : tabs[0]?.id ?? null;
+    return { tabs, activeId };
+  } catch {
+    const id = requested;
+    return { tabs: id ? [{ id, name: "Portfolio", key: null }] : [], activeId: id };
+  }
+}
+
+/** Persist the open-tab strip locally; portfolio records remain in Neon. */
+export function persistPortfolioTabs(tabs: PortfolioTab[], activeId: string | null) {
+  try {
+    localStorage.setItem(TABS, JSON.stringify(tabs.map(({ id, name }) => ({ id, name }))));
+    if (activeId) {
+      localStorage.setItem(ACTIVE, activeId);
+      localStorage.setItem(LAST, activeId);
+    } else {
+      localStorage.removeItem(ACTIVE);
+      localStorage.removeItem(LAST);
+    }
+  } catch {
+    // The current app still works when browser storage is blocked; only tab restoration is lost.
   }
 }
 
@@ -224,13 +268,14 @@ export function forgetLast() {
 
 type Preferences = { total_value: number | null; target: Mix | null };
 
-export async function loadPortfolio(id: string): Promise<{ holdings: Holding[]; target: Mix | null }> {
+export async function loadPortfolio(id: string): Promise<{ name: string; holdings: Holding[]; target: Mix | null }> {
   const [portfolio, prefs] = await Promise.all([
-    call<{ funds: { ticker: string; name: string; weight: number }[] }>(`/portfolios/${encodeURIComponent(id)}`),
+    call<{ name: string; funds: { ticker: string; name: string; weight: number }[] }>(`/portfolios/${encodeURIComponent(id)}`),
     call<Preferences>(`/portfolios/${encodeURIComponent(id)}/preferences`),
   ]);
   const total = prefs.total_value ?? 10000;
   return {
+    name: portfolio.name,
     holdings: portfolio.funds
       .map((f) => ({ ticker: f.ticker, name: f.name, amount: Math.round(f.weight * total * 100) / 100 }))
       .sort((a, b) => b.amount - a.amount),
@@ -238,14 +283,32 @@ export async function loadPortfolio(id: string): Promise<{ holdings: Holding[]; 
   };
 }
 
+export async function createPortfolio(name: string): Promise<SavedPortfolio> {
+  const created = await call<{ id: string; edit_key: string }>("/portfolios", {
+    method: "POST",
+    body: JSON.stringify({ name, funds: [] }),
+  });
+  remember(created.id, created.edit_key);
+  return { id: created.id, key: created.edit_key };
+}
+
+export async function renamePortfolio(saved: SavedPortfolio, name: string): Promise<void> {
+  await call(`/portfolios/${encodeURIComponent(saved.id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+    editKey: saved.key ?? undefined,
+  });
+}
+
 /** Create or update the saved portfolio; returns where it now lives. */
-export async function savePortfolio(saved: Saved | null, holdings: Holding[], target: Mix | null): Promise<PortfolioSaveResult> {
+export async function savePortfolio(saved: SavedPortfolio | null, holdings: Holding[], target: Mix | null,
+                                    name = "My ETFs"): Promise<PortfolioSaveResult> {
   const kept = holdings.filter((h) => h.amount > 0);
   const total = kept.reduce((a, h) => a + h.amount, 0);
   const weights = kept.map((h) => h.amount / total);
   // The API wants weights summing to exactly 1: give the rounding residue to the last one.
   if (weights.length) weights[weights.length - 1] = 1 - weights.slice(0, -1).reduce((a, w) => a + w, 0);
-  const body = JSON.stringify({ name: "My ETFs", funds: kept.map((h, i) => ({ ticker: h.ticker, weight: weights[i] })) });
+  const body = JSON.stringify({ name, funds: kept.map((h, i) => ({ ticker: h.ticker, weight: weights[i] })) });
   let place = saved;
   let previousTickers = new Set<string>();
   if (place?.key) {

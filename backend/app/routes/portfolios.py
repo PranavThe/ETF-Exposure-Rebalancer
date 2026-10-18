@@ -16,7 +16,8 @@ from backend.analytics.portfolio import analyze_latest
 from ..db import get_session
 from ..models import (Fund, Holding, Portfolio, PortfolioFund, ProviderHolding,
                       ProviderHoldingsSnapshot, SecurityPrice, Snapshot, utcnow)
-from ..portfolio_schemas import PortfolioCreated, PortfolioIn, PortfolioLatest, PortfolioOut
+from ..portfolio_schemas import (PortfolioCreated, PortfolioIn, PortfolioLatest,
+                                 PortfolioNameIn, PortfolioOut)
 from .funds import sector_map, snapshot_meta
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -110,6 +111,24 @@ def replace_portfolio(
     session.add_all(PortfolioFund(portfolio_id=portfolio.id, fund_id=fund.id, weight=weight)
                     for fund, weight in funds)
     portfolio.name = body.name.strip()
+    portfolio.updated_at = utcnow()
+    session.commit()
+    return portfolio_out(session, portfolio)
+
+
+@router.patch("/{portfolio_id}", response_model=PortfolioOut)
+def rename_portfolio(
+    portfolio_id: str, body: PortfolioNameIn,
+    edit_key: str | None = Header(default=None, alias="X-Portfolio-Edit-Key"),
+    session: Session = Depends(get_session),
+):
+    """Rename a saved portfolio without resubmitting or replacing its allocations."""
+    portfolio = portfolio_or_404(session, portfolio_id)
+    require_edit_key(portfolio, edit_key)
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(422, "portfolio name cannot be blank")
+    portfolio.name = name
     portfolio.updated_at = utcnow()
     session.commit()
     return portfolio_out(session, portfolio)
