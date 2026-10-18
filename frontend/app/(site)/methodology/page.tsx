@@ -148,8 +148,9 @@ export default function MethodologyPage() {
                 A holding&apos;s sector comes from a maintained reference list for that security, then from the
                 issuer&apos;s own sector column. If neither resolves it, the planner uses a company-name reference,
                 then the sector of the same security in another eligible ETF. Remaining gaps are
-                <Term>Unclassified</Term>. For TickerInside weights, stored ticker-sector references are used instead;
-                unknown symbols remain unclassified. Issuers spell sectors differently, so known labels are mapped
+                <Term>Unclassified</Term>. For TickerInside weights, the planner first uses a matching ticker&apos;s sector
+                from stored issuer/SEC equity holdings, then a ticker-sector reference; unknown symbols remain
+                unclassified. Issuers spell sectors differently, so known labels are mapped
                 to standard sectors. Non-equity rows in issuer and SEC files, such as cash, money-market funds,
                 futures or warrants, go to <Term>Cash &amp; other</Term>.
               </p>
