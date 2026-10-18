@@ -1,9 +1,11 @@
 import Link from "next/link";
 
-import { Crosshair } from "./Frame";
-import { LAUNCH_APP, METHODOLOGY } from "./links";
+import { BRAND } from "@/lib/brand";
 
-const DATA_SOURCES = ["Issuer holdings files", "SEC N-PORT filings"];
+import { Crosshair } from "./Frame";
+import { LAUNCH_APP } from "./links";
+
+const DATA_SOURCES = ["ARK Invest", "iShares", "SEC N-PORT filings"];
 
 /** White rectangular call to action with crosshair marks at its corners. */
 export function LaunchButton() {
@@ -36,29 +38,29 @@ export default function Hero() {
       <div className="relative flex flex-1 flex-col justify-end px-5 pt-40 pb-12 sm:px-8 sm:pb-14 lg:px-14">
         <h1
           id="hero-heading"
-          className="site-gradient-text max-w-[980px] pb-[0.08em] text-[44px] leading-[1.02] font-light tracking-[-0.035em] text-balance sm:text-[64px] lg:text-[84px]"
+          className="site-gradient-text max-w-[1040px] pb-[0.08em] text-[44px] leading-[1.02] font-light tracking-[-0.035em] text-balance sm:text-[64px] lg:text-[84px]"
         >
-          The holdings terminal for active ETFs.
+          See what you really own. Choose the mix you want.
         </h1>
-        <p className="mt-6 max-w-[560px] text-[16px] leading-[1.6] text-muted sm:text-[17px]">
-          See how an actively managed ETF&apos;s holdings changed between two issuer-published snapshots, with every
-          weight change split into price effect and portfolio activity.
+        <p className="mt-6 max-w-[580px] text-[16px] leading-[1.6] text-muted sm:text-[17px]">
+          Add the ETFs you hold and how much is in each. {BRAND} looks inside every fund, shows how your money is
+          spread across sectors, and works out the moves that get you to the mix you choose.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5">
           <LaunchButton />
-          <Link
-            href={METHODOLOGY.href}
+          <a
+            href="#how"
             className="font-mono text-[12px] tracking-[0.06em] text-fg/60 uppercase transition-colors hover:text-fg"
           >
-            Read the methodology →
-          </Link>
+            See how it works ↓
+          </a>
         </div>
       </div>
 
       <div className="relative mx-5 border-t border-line text-faint sm:mx-8 lg:mx-14">
         <Crosshair className="left-1/2 -top-[5px] -translate-x-1/2" />
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3 py-6 sm:gap-x-10">
-          <span className="label">Sources supported</span>
+          <span className="label">Holdings from</span>
           {DATA_SOURCES.map((s) => (
             <span key={s} className="text-[14px] font-semibold tracking-[0.02em] text-fg/55 uppercase sm:text-[15px]">
               {s}

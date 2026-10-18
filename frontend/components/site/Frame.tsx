@@ -34,7 +34,7 @@ export function Frame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Small uppercase mono tag, e.g. "THE TERMINAL". */
+/** Small uppercase mono tag, e.g. "HOW IT WORKS". */
 export function TagPill({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-block bg-panel-3 px-2.5 py-1.5 font-mono text-[11px] leading-none tracking-[0.08em] text-fg/85 uppercase">
