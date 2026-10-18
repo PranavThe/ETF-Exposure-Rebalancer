@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 
 import { Crosshair } from "./Frame";
+import HeroRings from "./HeroRings";
 import HeroSpray from "./HeroSpray";
 import { LAUNCH_APP } from "./links";
 
@@ -36,19 +37,21 @@ export default function Hero() {
       className="relative flex min-h-[max(620px,calc(100svh-105px))] flex-col overflow-hidden bg-[#050506]"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_70%_25%,rgba(122,115,240,0.14),transparent_48%),radial-gradient(ellipse_at_15%_80%,rgba(201,133,0,0.08),transparent_40%)]" />
+      <HeroRings />
       <HeroSpray />
       <div className="relative flex flex-1 flex-col justify-end px-5 pt-40 pb-12 sm:px-8 sm:pb-14 lg:px-14">
         <h1
           id="hero-heading"
+          data-hero-text
           className="site-gradient-text max-w-[1040px] pb-[0.08em] text-[44px] leading-[1.02] font-light tracking-[-0.035em] text-balance sm:text-[64px] lg:text-[84px]"
         >
           See what you really own. Choose the mix you want.
         </h1>
-        <p className="mt-6 max-w-[580px] text-[16px] leading-[1.6] text-muted sm:text-[17px]">
+        <p data-hero-text className="mt-6 max-w-[580px] text-[16px] leading-[1.6] text-muted sm:text-[17px]">
           Add the ETFs you hold and how much is in each. {BRAND} uses available holdings to show how your money is
           spread across sectors, then works out moves toward the mix you choose.
         </p>
-        <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5">
+        <div data-hero-text className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5">
           <LaunchButton />
           <a
             href="#how"
