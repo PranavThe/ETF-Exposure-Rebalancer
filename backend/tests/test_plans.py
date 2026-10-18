@@ -84,20 +84,44 @@ def test_planner_uses_newer_tickerinside_weights_and_preserves_provenance(client
         session.add(snapshot)
         session.flush()
         session.add_all([
-            ProviderHolding(snapshot_id=snapshot.id, ticker="MIXED0", weight=0.75),
-            ProviderHolding(snapshot_id=snapshot.id, ticker="UNSEEN", weight=0.25),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="MIXED0", weight=0.85),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="UNSEEN", weight=0.15),
         ])
 
     covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
     assert covered["MIXED"]["source_provider"] == "tickerinside"
     assert covered["MIXED"]["as_of_date"] == "2026-10-17"
-    assert mix(covered["MIXED"]["sectors"]) == {"Technology": 0.75, "Unclassified": 0.25}
+    assert mix(covered["MIXED"]["sectors"]) == pytest.approx({"Technology": 0.85, "Unclassified": 0.15})
 
     response = client.post("/plan", json={"holdings": [{"ticker": "MIXED", "amount": 1000}]})
     fund_row = next(row for row in response.json()["funds"] if row["ticker"] == "MIXED")
     assert fund_row["source_provider"] == "tickerinside"
     assert fund_row["source_layer"] == "issuer"
 
+
+
+def test_newer_tickerinside_weights_that_classify_little_keep_the_filing(client, allow):
+    # A foreign fund: the filing resolves every holding; the newer provider file lists local
+    # tickers with no known sector. The filing's mix stays.
+    allow("FORGN")
+    add_fund("FORGN", {"Financials": 60, "Technology": 40})
+    with Session(get_engine()) as session, session.begin():
+        snapshot = ProviderHoldingsSnapshot(
+            provider="tickerinside", fund_ticker="FORGN", fund_name="Foreign Fund",
+            as_of_date=date(2026, 10, 17), source_layer="issuer", source_url="https://example.test",
+            cite_as="TickerInside", content_hash="provider-forgn",
+        )
+        session.add(snapshot)
+        session.flush()
+        session.add_all([
+            ProviderHolding(snapshot_id=snapshot.id, ticker="NOSUCH9", weight=0.7),
+            ProviderHolding(snapshot_id=snapshot.id, ticker="FORGN0", weight=0.3),
+        ])
+
+    covered = {row["ticker"]: row for row in client.get("/etfs/covered").json()}
+    assert covered["FORGN"]["source_provider"] != "tickerinside"
+    assert covered["FORGN"]["as_of_date"] == "2026-10-16"
+    assert mix(covered["FORGN"]["sectors"]) == pytest.approx({"Financials": 0.6, "Technology": 0.4})
 
 def test_plan_without_target_reports_current_mix(client):
     add_fund("TECHX", {"Information Technology": 100})

@@ -47,12 +47,32 @@ def read_name_sectors() -> dict[str, str]:
             if r["normalized_name"] and r["sector"]}
 
 
+# iShares files of foreign stocks, whose tickers are local exchange codes: COR is Cencora in New
+# York and Corticeira Amorim in Lisbon. Their tickers only fill gaps left by U.S. listings.
+NON_US_SOURCES = frozenset({"EFA", "IEFA", "IEMG", "IXUS", "EWC"})
+
+
 def read_ticker_sectors() -> dict[str, str]:
-    """Stock ticker (letters and digits only, upper case) -> sector, from name_sectors.csv."""
+    """Stock ticker (letters and digits only, upper case) -> sector, from name_sectors.csv.
+
+    A ticker listed by a U.S. fund takes that row's sector. A ticker seen only in foreign-stock
+    files is used when all of those rows agree on the sector.
+    """
     if not (REFERENCE_DIR / "name_sectors.csv").exists():
         return {}
-    return {normalize_symbol(r["ticker"]): r["sector"] for r in _read("name_sectors.csv")
-            if r.get("ticker") and r["sector"]}
+    us: dict[str, str] = {}
+    foreign: dict[str, set[str]] = {}
+    for r in _read("name_sectors.csv"):
+        if not (r.get("ticker") and r["sector"]):
+            continue
+        symbol = normalize_symbol(r["ticker"])
+        if set(r.get("funds", "").split()) <= NON_US_SOURCES:
+            foreign.setdefault(symbol, set()).add(r["sector"])
+        else:
+            us[symbol] = r["sector"]
+    out = {symbol: next(iter(sectors)) for symbol, sectors in foreign.items() if len(sectors) == 1}
+    out.update(us)
+    return out
 
 
 def normalize_symbol(ticker: str) -> str:

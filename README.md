@@ -105,16 +105,17 @@ weight differences: 0 means identical mixes; 1 means no overlap.
   the issuer's label, then the company-name reference, then a matching security's sector in an
   allowlisted ETF. Remaining gaps appear as **Unclassified**. Non-equity issuer/SEC rows appear
   as **Cash & other**. Provider weights use ticker-sector mappings from stored holdings and
-  reference data; unknown symbols remain unclassified.
+  reference data (a U.S. listing wins over a foreign local code with the same letters); unknown
+  symbols remain unclassified.
 - **Source selection:** the planner uses the latest issuer/SEC snapshot unless stored
-  TickerInside data is strictly newer or is the only available source. It reports the selected
-  source and date for each fund.
+  TickerInside data is the only available source, or is strictly newer and classifies as much of
+  the fund (or at least 80% of it). It reports the selected source and date for each fund.
 - **Eligible additions:** new ETFs come from `SUGGESTABLE_ETFS` and must be at least 80%
   classified. Funds you already hold outside the allowlist can be kept or reduced, but never
   increased. Synthetic fixtures are never suggested.
 - **Optimization:** a bounded least-squares problem balances closeness to the target with a
   small preference for smaller moves. New ETFs are considered one at a time and must improve
-  distance by at least 0.5 pp. The planner prunes small positions using a 1% threshold, rounds
+  distance by at least 0.5 pp, and so must each plan as a whole. The planner prunes small positions using a 1% threshold, rounds
   amounts to whole dollars, and omits unchanged or duplicate plans.
 - **Scythe, the assistant:** with `ANTHROPIC_API_KEY`, `/chat` uses the model configured in
   [`backend/app/assistant.py`](backend/app/assistant.py). Without a key, or when a supported API

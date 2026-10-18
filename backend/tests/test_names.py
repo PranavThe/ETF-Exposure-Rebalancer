@@ -5,6 +5,7 @@ import csv
 import pytest
 
 from backend.analytics.names import NameSectors, normalize_company_name
+from backend.pipeline.reference import read_ticker_sectors
 
 from .conftest import REFERENCE_DIR
 
@@ -103,3 +104,12 @@ def test_reference_file_covers_big_names():
     assert names.lookup("Exxon Mobil Corp") == "Energy"
     assert names.lookup("ALPHABET INC-A") == "Communication Services"
     assert "eqt" not in table  # EQT Corp (Energy) and EQT AB (Financials) share a name
+
+
+def test_ticker_sectors_prefer_us_listings_over_foreign_local_codes():
+    # COR is Cencora in New York and Corticeira Amorim in Lisbon; ELV and BDX collide the same way.
+    tickers = read_ticker_sectors()
+    assert tickers["COR"] == tickers["ELV"] == tickers["BDX"] == "Health Care"
+    assert tickers["ALL"] == "Financials"
+    # Foreign tickers still fill gaps when their rows agree.
+    assert tickers["NESN"] == "Consumer Staples"

@@ -12,10 +12,12 @@ from sqlalchemy.orm import Session
 
 from backend.analytics.names import NameSectors
 from backend.analytics.rebalance import (
+    MIN_CLASSIFIED,
     SUGGESTABLE_ETFS,
     UNCLASSIFIED,
     build_plans,
     canonical_sector,
+    classified_share,
     distance,
     exposure,
     fund_sector_weights,
@@ -207,7 +209,12 @@ def _ticker_sectors(session: Session, symbols: set[str]) -> dict[str, str]:
 
 
 def _provider_entries(session: Session, tickers: set[str], filed: dict[str, Entry]) -> dict[str, Entry]:
-    """TickerInside weights for `tickers`, where they are newer than the issuer/SEC snapshot."""
+    """TickerInside weights for `tickers`, where they are newer than the issuer/SEC snapshot.
+
+    Newer weights replace a filing only if they classify as much of the fund, or at least
+    MIN_CLASSIFIED of it: foreign funds' local tickers often have no known sector, and a fresher
+    but mostly unclassified mix would hide what the filing shows.
+    """
     latest: dict[str, ProviderHoldingsSnapshot] = {}
     for snap in session.scalars(
         select(ProviderHoldingsSnapshot)
@@ -235,10 +242,17 @@ def _provider_entries(session: Session, tickers: set[str], filed: dict[str, Entr
             mix = raw[snap.id]
             total = sum(mix.values())
             _provider_mixes[(snap.id, snap.content_hash)] = {k: v / total for k, v in mix.items()} if total > 0 else {}
+    def usable(ticker: str, mix: dict[str, float]) -> bool:
+        if not mix:
+            return False
+        return ticker not in filed or classified_share(mix) >= min(classified_share(filed[ticker][2]),
+                                                                   MIN_CLASSIFIED)
+
     funds = {f.ticker: f for f in session.scalars(select(Fund).where(Fund.ticker.in_(sorted(newer))))}
     return {t: (funds[t], snap.as_of_date, _provider_mixes[(snap.id, snap.content_hash)], "tickerinside",
                 snap.source_layer)
-            for t, snap in newer.items() if _provider_mixes.get((snap.id, snap.content_hash)) and t in funds}
+            for t, snap in newer.items()
+            if t in funds and usable(t, _provider_mixes.get((snap.id, snap.content_hash), {}))}
 
 
 def sector_list(mix: dict[str, float]) -> list[dict]:
