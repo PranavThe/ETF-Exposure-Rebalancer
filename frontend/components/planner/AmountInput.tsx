@@ -22,8 +22,8 @@ export default function AmountInput({
 }) {
   // What the user typed, kept only while it still describes `value` (an outside change wins).
   const [draft, setDraft] = useState<{ text: string; value: number } | null>(null);
-  const [focused, setFocused] = useState(false);
-  const formatted = value ? (focused ? String(Math.round(value * 100) / 100) : Math.round(value).toLocaleString("en-US")) : "";
+  // The same text focused or not: changing it on focus moved the caret, so typing appended.
+  const formatted = value ? value.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "";
   const text = draft && draft.value === value ? draft.text : formatted;
 
   return (
@@ -37,14 +37,8 @@ export default function AmountInput({
         value={text}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        onFocus={(e) => {
-          setFocused(true);
-          requestAnimationFrame(() => e.target.select());
-        }}
-        onBlur={() => {
-          setFocused(false);
-          setDraft(null);
-        }}
+        onFocus={(e) => requestAnimationFrame(() => e.target.select())}
+        onBlur={() => setDraft(null)}
         onChange={(e) => {
           const cleaned = e.target.value.replace(/[^0-9.,]/g, "");
           const parsed = Number(cleaned.replace(/,/g, ""));

@@ -100,7 +100,8 @@ export default function PlannerApp() {
       },
       () => {
         if (!active) return;
-        if (!requested) forgetLast();
+        if (requested) toast("Couldn’t open that saved portfolio. The link may be wrong or deleted.", "error");
+        else forgetLast();
         setReady(true);
       },
     );
@@ -211,7 +212,7 @@ export default function PlannerApp() {
   function toast(text: string, tone: Toast["tone"] = "ok") {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-2), { id, text, tone }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2600);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === "error" ? 6000 : 2600);
   }
 
   function highlight(tickers: string[]) {

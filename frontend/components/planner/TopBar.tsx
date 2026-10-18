@@ -11,7 +11,7 @@ import { planner, sectorColor, type CoveredEtf } from "@/lib/planner";
 
 import { Monogram } from "./ui";
 
-type Option = { ticker: string; name: string; covered?: CoveredEtf; hasData: boolean };
+type Option = { ticker: string; name: string; covered?: CoveredEtf; hasData: boolean; held: boolean };
 
 function MiniMix({ etf }: { etf: CoveredEtf }) {
   return (
@@ -79,14 +79,14 @@ function EtfSearch({
     const byTicker = new Map(covered.map((c) => [c.ticker, c]));
     const fromCovered = covered
       .filter((e) => !e.sample && (!q || e.ticker.toLowerCase().includes(q) || e.name.toLowerCase().includes(q)))
-      .map((e) => ({ ticker: e.ticker, name: e.name, covered: e, hasData: true }));
+      .map((e) => ({ ticker: e.ticker, name: e.name, covered: e, hasData: true, held: held.has(e.ticker) }));
     const seen = new Set(fromCovered.map((o) => o.ticker));
     const fromSearch = (found?.term === term ? found.funds : [])
       .filter((f) => !seen.has(f.ticker))
-      .map((f) => ({ ticker: f.ticker, name: f.name, covered: byTicker.get(f.ticker), hasData: f.snapshot_count > 0 || Boolean(f.provider_holdings_as_of_date) }));
+      .map((f) => ({ ticker: f.ticker, name: f.name, covered: byTicker.get(f.ticker), hasData: f.snapshot_count > 0 || Boolean(f.provider_holdings_as_of_date), held: held.has(f.ticker) }));
+    // ETFs already held stay listed (marked), so typing one's ticker never picks the next match.
     return [...fromCovered, ...fromSearch]
-      .filter((o) => !held.has(o.ticker))
-      .sort((a, b) => rank(a.ticker) - rank(b.ticker) || Number(b.hasData) - Number(a.hasData))
+      .sort((a, b) => rank(a.ticker) - rank(b.ticker) || Number(a.held) - Number(b.held) || Number(b.hasData) - Number(a.hasData))
       .slice(0, 40);
   }, [covered, found, term, held]);
   const searching = Boolean(term) && found?.term !== term;
@@ -114,7 +114,7 @@ function EtfSearch({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          onBlur={() => setTimeout(() => document.activeElement !== input.current && setOpen(false), 120)}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
@@ -125,6 +125,7 @@ function EtfSearch({
             } else if (e.key === "Enter" && options[active]) {
               pick(options[active]);
             } else if (e.key === "Escape") {
+              setOpen(false);
               input.current?.blur();
             }
           }}
@@ -159,7 +160,9 @@ function EtfSearch({
                     <span className="block font-mono text-[13px] font-semibold text-fg">{o.ticker}</span>
                     <span className="block truncate text-xs text-muted">{o.name}</span>
                   </span>
-                  {o.covered ? (
+                  {o.held ? (
+                    <span className="shrink-0 rounded bg-panel-3 px-1.5 py-0.5 font-mono text-[10px] text-muted">added</span>
+                  ) : o.covered ? (
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       <MiniMix etf={o.covered} />
                       <span className="font-mono text-[10px] text-faint">
