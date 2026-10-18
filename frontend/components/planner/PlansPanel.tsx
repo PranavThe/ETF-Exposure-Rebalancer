@@ -134,7 +134,9 @@ export default function PlansPanel({
         </p>
       ) : !plan ? (
         <p className="px-4 py-4 text-sm text-muted">
-          {hasHoldings || money === "add"
+          {hasHoldings && money === "same" && beforeDistance !== null && beforeDistance < 0.0005
+            ? "Your mix already matches this target."
+            : hasHoldings || money === "add"
             ? loading
               ? "Working out the moves…"
               : "No moves would bring you closer to this target. Try allowing new ETFs or adding money."
