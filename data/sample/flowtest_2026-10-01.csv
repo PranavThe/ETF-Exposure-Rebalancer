@@ -1,0 +1,4 @@
+date,fund,security_id,ticker,name,asset_class,shares,price,market_value,weight
+2026-10-01,FLOWTEST,JJJ,JJJ,JJJ Corp,equity,100,10,1000,0.3333333333
+2026-10-01,FLOWTEST,KKK,KKK,KKK Corp,equity,100,10,1000,0.3333333333
+2026-10-01,FLOWTEST,LLL,LLL,LLL Corp,equity,100,10,1000,0.3333333333

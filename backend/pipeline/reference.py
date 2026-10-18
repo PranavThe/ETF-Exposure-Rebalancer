@@ -1,9 +1,9 @@
-"""Reference data we maintain: data/reference/funds.csv and sectors.csv."""
+"""Reference data we maintain: data/reference/funds.csv, sectors.csv and name_sectors.csv."""
 
 import csv
 from pathlib import Path
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Fund, SecuritySector
@@ -16,28 +16,62 @@ def _read(name: str) -> list[dict[str, str]]:
         return [{k.strip(): (v or "").strip() for k, v in r.items()} for r in csv.DictReader(f)]
 
 
-def read_funds() -> list[dict]:
+def read_funds(*, include_samples: bool = False) -> list[dict]:
+    rows = _read("funds.csv")
+    if include_samples:
+        rows.extend(_read("../sample/funds.csv"))
     return [{"ticker": r["ticker"].upper(), "name": r["name"], "issuer": r["issuer"]}
-            for r in _read("funds.csv")]
+            for r in rows]
 
 
-def read_sectors() -> dict[str, str]:
+def read_sectors(*, include_samples: bool = False) -> dict[str, str]:
     sectors: dict[str, str] = {}
-    for r in _read("sectors.csv"):
+    rows = _read("sectors.csv")
+    if include_samples:
+        rows.extend(_read("../sample/sectors.csv"))
+    for r in rows:
         if r["security_id"] in sectors:
             raise ValueError(f"sectors.csv lists {r['security_id']} more than once")
         sectors[r["security_id"]] = r["sector"]
     return sectors
 
 
-def sync_reference(session: Session) -> None:
-    """Upsert funds from funds.csv and reload security_sectors from sectors.csv."""
+def read_name_sectors() -> dict[str, str]:
+    """Normalized company name -> sector, from name_sectors.csv (scripts/build_name_sectors.py).
+
+    Read-only reference for the planner; never loaded into the database. Empty if the file is missing.
+    """
+    if not (REFERENCE_DIR / "name_sectors.csv").exists():
+        return {}
+    return {r["normalized_name"]: r["sector"] for r in _read("name_sectors.csv")
+            if r["normalized_name"] and r["sector"]}
+
+
+def read_ticker_sectors() -> dict[str, str]:
+    """Stock ticker (letters and digits only, upper case) -> sector, from name_sectors.csv."""
+    if not (REFERENCE_DIR / "name_sectors.csv").exists():
+        return {}
+    return {normalize_symbol(r["ticker"]): r["sector"] for r in _read("name_sectors.csv")
+            if r.get("ticker") and r["sector"]}
+
+
+def normalize_symbol(ticker: str) -> str:
+    """'BRK.B', 'BRK/B' and 'brkb' all become 'BRKB'."""
+    return "".join(c for c in ticker.upper() if c.isalnum())
+
+
+def sync_reference(session: Session, *, include_samples: bool = False) -> None:
+    """Upsert production references and optionally local fixture references."""
     existing = {f.ticker: f for f in session.scalars(select(Fund))}
-    for f in read_funds():
+    for f in read_funds(include_samples=include_samples):
         fund = existing.get(f["ticker"])
         if fund is None:
             session.add(Fund(**f))
         else:
             fund.name, fund.issuer = f["name"], f["issuer"]
-    session.execute(delete(SecuritySector))
-    session.add_all(SecuritySector(security_id=k, sector=v) for k, v in read_sectors().items())
+    existing_sectors = {row.security_id: row for row in session.scalars(select(SecuritySector))}
+    for security_id, sector in read_sectors(include_samples=include_samples).items():
+        if security_id in existing_sectors:
+            existing_sectors[security_id].sector = sector
+        else:
+            session.add(SecuritySector(security_id=security_id, sector=sector))

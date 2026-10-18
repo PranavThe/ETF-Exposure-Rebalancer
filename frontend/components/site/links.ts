@@ -6,7 +6,7 @@ export const ARK_CSV_URL =
 
 export type SiteLink = { label: string; href: string; external?: boolean };
 
-export const LAUNCH_APP: SiteLink = { label: "Launch app", href: "/discover" };
+export const LAUNCH_APP: SiteLink = { label: "Open the app", href: "/app" };
 export const METHODOLOGY: SiteLink = { label: "Methodology", href: "/methodology" };
 export const API_DOCS: SiteLink = { label: "API docs", href: apiDocsUrl, external: true };
 export const GITHUB: SiteLink = { label: "GitHub", href: GITHUB_URL, external: true };

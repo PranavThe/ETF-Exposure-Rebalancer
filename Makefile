@@ -10,14 +10,14 @@ setup:
 test:
 	$(PY) -m pytest
 
-# The fund comes from the file name prefix: demo_2026-10-01.csv -> DEMO.
+# Local test fixture ingestion. Production deploys do not call this target.
 ingest-sample:
-	@for f in data/sample/*.csv; do \
+	@for f in data/sample/*_*.csv; do \
 		fund=$$(basename $$f | cut -d_ -f1 | tr a-z A-Z); \
 		$(PY) scripts/run_pipeline.py --fund $$fund --file $$f --adapter sample || exit 1; \
 	done
 
-# Real issuer files saved by scripts/fetch_holdings.py: ARKK_2026-10-16.csv -> ARKK.
+# Issuer files saved by scripts/fetch_holdings.py: ARKK_2026-10-16.csv -> ARKK.
 ingest-raw:
 	@for f in data/raw/*.csv; do \
 		[ -e "$$f" ] || continue; \
@@ -33,5 +33,5 @@ web:
 
 demo:
 	$(PY) -c "from backend.app.db import reset_db; reset_db()"
-	$(PY) scripts/seed_db.py
+	$(PY) scripts/seed_db.py --include-samples
 	$(MAKE) api

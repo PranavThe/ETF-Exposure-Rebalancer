@@ -102,3 +102,261 @@ body {
     animation: none;
   }
 }
+
+/* Target sliders in the planner: the track is drawn underneath, so only the thumb shows here. */
+.mix-range {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+}
+.mix-range:focus {
+  outline: none;
+}
+.mix-range::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+.mix-range::-moz-range-track {
+  background: transparent;
+}
+.mix-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  border-radius: 9999px;
+  background: var(--color-fg);
+  border: 2px solid var(--color-accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-strong) 22%, transparent);
+}
+.mix-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--color-fg);
+  border: 2px solid var(--color-accent-strong);
+}
+.mix-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+/* Before a target is set the thumbs sit on the current mix, quieter until touched. */
+.mix-range-idle::-webkit-slider-thumb {
+  background: var(--color-panel-3);
+  border-color: var(--color-line-2);
+  box-shadow: none;
+}
+.mix-range-idle::-moz-range-thumb {
+  background: var(--color-panel-3);
+  border-color: var(--color-line-2);
+}
+.mix-range-idle:hover::-webkit-slider-thumb {
+  border-color: var(--color-accent-strong);
+}
+
+/* ---- Planner app: motion and surfaces (Kairos terminal style) ------------------------------ */
+
+@theme {
+  --animate-fade-up: fade-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 300ms ease-out both;
+  --animate-pop: pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-toast: toast-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-up) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+@keyframes flash-up {
+  from {
+    background: color-mix(in srgb, var(--color-up) 18%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-panel-2) 0%, var(--color-panel-3) 50%, var(--color-panel-2) 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+  border-radius: 4px;
+}
+.typing-dot {
+  animation: typing 1.2s ease-in-out infinite;
+}
+.live-dot {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+.flash {
+  animation: flash-up 900ms ease-out;
+}
+
+/* A smooth width/size change for bars and gauges. */
+.bar-anim {
+  transition:
+    width 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 300ms;
+}
+.arc-anim {
+  transition:
+    stroke-dasharray 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    stroke-dashoffset 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 300ms,
+    stroke-width 200ms;
+}
+
+/* Thin decorative arcs behind the app, as on the Kairos portfolio and leaderboard pages. */
+.app-arcs {
+  background-image:
+    radial-gradient(120% 90% at 115% 120%, transparent 59.85%, color-mix(in srgb, var(--color-fg) 6%, transparent) 60%, transparent 60.15%),
+    radial-gradient(120% 90% at 115% 120%, transparent 69.85%, color-mix(in srgb, var(--color-fg) 5%, transparent) 70%, transparent 70.15%),
+    radial-gradient(120% 90% at 115% 120%, transparent 79.85%, color-mix(in srgb, var(--color-fg) 4%, transparent) 80%, transparent 80.15%),
+    radial-gradient(60% 50% at 50% -10%, color-mix(in srgb, var(--color-accent-strong) 9%, transparent), transparent 70%);
+}
+
+/* Dot matrix used in empty states. */
+.dot-matrix {
+  background-image: radial-gradient(color-mix(in srgb, var(--color-accent-strong) 55%, transparent) 1.2px, transparent 1.4px);
+  background-size: 10px 10px;
+  mask-image: radial-gradient(closest-side, black, transparent);
+}
+
+/* Inputs without number spinners. */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .typing-dot,
+  .live-dot,
+  .flash {
+    animation: none;
+  }
+  .bar-anim,
+  .arc-anim {
+    transition: none;
+  }
+  [class*="animate-"] {
+    animation: none !important;
+  }
+}
+
+/* Target slider: a slim lavender handle over the "now" bar. */
+.target-range {
+  appearance: none;
+  background: transparent;
+  cursor: grab;
+  margin: 0;
+}
+.target-range:active {
+  cursor: grabbing;
+}
+.target-range:focus {
+  outline: none;
+}
+.target-range::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+.target-range::-moz-range-track {
+  background: transparent;
+}
+.target-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 8px;
+  height: 22px;
+  margin-top: 0;
+  border-radius: 3px;
+  background: var(--color-fg);
+  border: 2px solid var(--color-accent-strong);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent-strong) 18%, transparent), 0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: transform 150ms, box-shadow 150ms;
+}
+.target-range:hover::-webkit-slider-thumb,
+.target-range:focus-visible::-webkit-slider-thumb {
+  transform: scaleY(1.12);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 28%, transparent), 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.target-range::-moz-range-thumb {
+  width: 6px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--color-fg);
+  border: 2px solid var(--color-accent-strong);
+}
+.target-idle::-webkit-slider-thumb {
+  background: var(--color-panel-3);
+  border-color: var(--color-line-2);
+  box-shadow: none;
+}
+.target-idle:hover::-webkit-slider-thumb {
+  border-color: var(--color-accent-strong);
+}

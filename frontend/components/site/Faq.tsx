@@ -10,55 +10,70 @@ import SiteLinkItem from "./SiteLinkItem";
 
 const ITEMS = [
   {
-    title: `What is ${BRAND}?`,
-    body: (
-      <p>
-        {BRAND} shows how an actively managed ETF&apos;s holdings changed between two issuer-published snapshots. Every
-        weight change is split into a price effect, what market moves alone would have done, and portfolio activity,
-        the part that comes from different share counts. Events explain each material change and link back to the
-        source files.
-      </p>
-    ),
-  },
-  {
-    title: "Which funds does it cover?",
-    body: (
-      <p>
-        One real fund so far: ARK Innovation ETF (ARKK), read from ARK Invest&apos;s daily holdings CSV. Its first
-        stored snapshot is dated 2026-10-16, and a comparison needs a second market day, so ARKK history grows one file
-        at a time. Three synthetic test funds, DEMO, SPLT and FLOW, exercise the decomposition, split detection and flow
-        handling against known answers. Other issuers plug in through an adapter.
-      </p>
-    ),
-  },
-  {
-    title: "What is the difference between price effect and portfolio activity?",
-    body: (
-      <p>
-        The price effect is how a weight would have moved if the earlier share counts had simply been carried to the
-        later prices: the counterfactual. Portfolio activity is everything else, the change that comes from different
-        share counts. The two always add up to the total change. In DEMO, Health Care moved +5.0 pp: price −2.8 pp,
-        portfolio activity +7.8 pp.
-      </p>
-    ),
-  },
-  {
-    title: "How are creations and redemptions handled?",
-    body: (
-      <p>
-        When investors create or redeem ETF shares, the fund scales every position together. {BRAND} measures that with
-        a flow factor, the median ratio of later to earlier share counts across holdings present in both snapshots, and
-        divides it out before calling a position increased or decreased. In the FLOW test fund every share count rises
-        10%: the flow factor is 1.10 and no events fire.
-      </p>
-    ),
-  },
-  {
     title: "Is this investment advice?",
     body: (
       <p>
-        No. {BRAND} describes what changed in published holdings. It does not recommend any security or fund, and it
-        does not claim to know why a manager made a change. {DISCLAIMER}
+        No. {BRAND} shows what your ETFs hold and works out moves toward a mix that you choose. It never suggests what
+        mix you should want, which ETFs are good, or where markets are going. Whether and how you act is up to you.{" "}
+        {DISCLAIMER}
+      </p>
+    ),
+  },
+  {
+    title: "Does the assistant decide my mix?",
+    body: (
+      <p>
+        No. The assistant, Claude, only turns your words into numbers: &ldquo;less tech, more health care&rdquo; becomes
+        a target mix you can see and change. Ask it which sector is best and it will tell you the choice is yours. The
+        sliders do everything without it.
+      </p>
+    ),
+  },
+  {
+    title: "Where does the data come from?",
+    body: (
+      <p>
+        From holdings files that fund issuers publish, currently ARK Invest and iShares, and from the holdings that
+        funds report to the SEC in N-PORT filings. Each ETF uses its most recent stored snapshot, so what you see is
+        usually a day or more behind, and N-PORT holdings can be a few months old.
+      </p>
+    ),
+  },
+  {
+    title: "Why is my ETF missing or flagged?",
+    body: (
+      <p>
+        You can add any of thousands of U.S.-listed ETFs, but holdings data is loaded for only some of them so far. An
+        ETF without holdings data stays in your list, is clearly flagged, and is left out of the math, so your sector
+        mix describes only the part {BRAND} can see.
+      </p>
+    ),
+  },
+  {
+    title: "Do I need an account?",
+    body: (
+      <p>
+        No. Your portfolio saves to its own link, with no name or email. The private key that lets you change it is
+        kept in this browser. Anyone you share the link with can see the portfolio, but only a browser with the key can
+        edit it.
+      </p>
+    ),
+  },
+  {
+    title: "Does it account for taxes, fees or transaction costs?",
+    body: (
+      <p>
+        No. Reducing an ETF can mean a tax bill, and moving money can come with costs. {BRAND} leaves all of that out,
+        so weigh it yourself before you make any change.
+      </p>
+    ),
+  },
+  {
+    title: "What does “pp” mean?",
+    body: (
+      <p>
+        Percentage points: the plain difference between two percentages. If Technology goes from 52.6% to 47.6% of your
+        portfolio, that is &minus;5.0 pp. Saying &ldquo;&minus;5%&rdquo; would mean something else: 5% of 52.6%.
       </p>
     ),
   },
@@ -77,7 +92,7 @@ export default function Faq() {
           Frequently asked questions
         </h2>
         <p className="mt-6 max-w-[380px] text-[15px] leading-relaxed text-muted">
-          More detail, including every threshold, is on the{" "}
+          Every rule the sector mix and the plans follow, with formulas and thresholds, is on the{" "}
           <Link href={METHODOLOGY.href} className="text-fg underline decoration-line-2 underline-offset-4 hover:decoration-fg">
             methodology page
           </Link>

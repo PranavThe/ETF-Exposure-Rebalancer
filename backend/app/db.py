@@ -1,7 +1,7 @@
 import os
 from typing import Iterator
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import Session
 
 from .models import Base
@@ -45,6 +45,33 @@ def reset_engine() -> None:
 
 def init_db() -> None:
     Base.metadata.create_all(get_engine())
+
+
+def migrate_provider_holding_ticker(engine: Engine | None = None) -> bool:
+    """Widen the legacy provider-holdings identifier column on PostgreSQL.
+
+    ``create_all`` creates missing tables but does not alter existing ones. This
+    small, idempotent migration keeps existing Neon databases in sync with the
+    Text column in the model. SQLite does not enforce VARCHAR lengths.
+    """
+    engine = engine or get_engine()
+    if engine.dialect.name != "postgresql":
+        return False
+
+    inspector = inspect(engine)
+    if not inspector.has_table("provider_holdings"):
+        return False
+    columns = {column["name"]: column["type"]
+               for column in inspector.get_columns("provider_holdings")}
+    ticker_type = columns.get("ticker")
+    if getattr(ticker_type, "length", None) != 32:
+        return False
+
+    with engine.begin() as connection:
+        connection.execute(text(
+            "ALTER TABLE provider_holdings ALTER COLUMN ticker TYPE TEXT"
+        ))
+    return True
 
 
 def reset_db() -> None:

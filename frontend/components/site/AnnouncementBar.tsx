@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
-const KEY = "site-banner-dismissed";
+// Bump the suffix whenever the message changes, so people who closed the old one see the new one.
+const KEY = "site-banner-dismissed-v2";
 const EVENT = "site-banner-change";
 
 // The dismissal is remembered per browser. Storage can be unavailable (private mode,
@@ -49,7 +50,7 @@ export default function AnnouncementBar() {
     <div role="region" aria-label="Announcement" className="relative flex min-h-10 items-center justify-center bg-panel px-10 py-2 text-center text-[12px] text-fg/85 sm:px-12 sm:text-[13px]">
       <p>
         <span className="mr-2 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-up align-middle" aria-hidden />
-        Now tracking ARKK daily holdings from ARK Invest
+        New: say the sector mix you want in plain words, and see the moves that get you there
       </p>
       <button
         type="button"

@@ -10,39 +10,30 @@ import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: `Methodology · ${BRAND}`,
-  description: `How ${BRAND} splits each weight change in an active ETF into price effect and portfolio activity: formulas, rules, thresholds and data sources.`,
+  description: `How ${BRAND} works out the sector mix inside your ETFs, measures the distance to the mix you want, and finds the moves that get you there: formulas, rules and data sources.`,
 };
 
 const SECTIONS: TocEntry[] = [
-  { id: "units", title: "Units" },
-  { id: "vectors", title: "Three weight vectors" },
-  { id: "decomposition", title: "Price effect and portfolio activity" },
-  { id: "flow", title: "Flow factor" },
-  { id: "splits", title: "Suspected corporate actions" },
-  { id: "status", title: "Position status" },
-  { id: "dilution", title: "Dilution" },
-  { id: "sectors", title: "Sectors" },
-  { id: "concentration", title: "Concentration" },
-  { id: "events", title: "Events and thresholds" },
-  { id: "caveats", title: "Caveats" },
-  { id: "sources", title: "Data sources" },
-  { id: "limitations", title: "Known limitations" },
+  { id: "overview", title: "The short version" },
+  { id: "units", title: "Percent and pp" },
+  { id: "etf-mix", title: "An ETF's sector mix" },
+  { id: "portfolio-mix", title: "Your portfolio's mix" },
+  { id: "distance", title: "Distance to your target" },
+  { id: "plans", title: "How plans are found" },
+  { id: "assistant", title: "The assistant" },
+  { id: "sources", title: "Data sources and freshness" },
+  { id: "saving", title: "Saving without an account" },
+  { id: "limitations", title: "Limitations" },
 ];
 
 const n = (id: string) => SECTIONS.findIndex((s) => s.id === id) + 1;
 const t = (id: string) => SECTIONS.find((s) => s.id === id)?.title ?? id;
 
-// Mirrors backend/analytics/config.py (CONFIG_VERSION "1").
-const CONFIG = `CONFIG_VERSION              = "1"
-POSITION_SHARE_THRESHOLD    = 0.05     # 5% flow-adjusted share change
-POSITION_ACTIVITY_THRESHOLD = 0.001    # 0.1 pp of portfolio activity
-SECTOR_DRIFT_THRESHOLD      = 0.01     # 1.0 pp
-CONCENTRATION_THRESHOLD     = 0.01     # 1.0 pp
-TOP_N                       = 10       # DEMO uses 2
-MIN_FLOW_SECURITIES         = 3
-SPLIT_RATIOS                = (2, 3, 4, 5, 10, 20)
-SPLIT_RATIO_TOLERANCE       = 0.01     # 1%
-SPLIT_PRICE_TOLERANCE       = 0.10     # 10%`;
+// Mirrors backend/analytics/rebalance.py (max_new_funds is build_plans' default; the app lets you change it).
+const PLANNER_CONFIG = `SHORTLIST_SIZE = 12       # candidate new ETFs considered per plan
+MIN_POSITION   = 0.01     # 1% of the portfolio
+MIN_GAIN       = 0.005    # 0.5 pp closer to the target
+max_new_funds  = 2        # default limit on new ETFs per plan`;
 
 export default function MethodologyPage() {
   return (
@@ -58,16 +49,18 @@ export default function MethodologyPage() {
             How the numbers work
           </h1>
           <p className="mt-6 max-w-[640px] text-[16px] leading-[1.65] text-muted sm:text-[17px]">
-            {BRAND} compares two issuer-published holdings snapshots of the same fund, A (earlier) and B (later), and
-            splits every weight change into a <Term>price effect</Term> and <Term>portfolio activity</Term>. This page
-            lists every formula, rule and threshold the comparison uses.
+            {BRAND} looks inside the ETFs you hold, adds up your <Term>sector mix</Term>, and works out{" "}
+            <Term>moves</Term> toward the mix you choose. This page explains every step, rule and threshold, in plain
+            words first and formulas after.
           </p>
           <ul className="mt-10 flex flex-wrap gap-2 font-mono text-[11px] tracking-[0.04em] text-muted uppercase">
-            {["Config version 1", "Fractions in the API", "Equity rows only", "Deterministic event IDs"].map((x) => (
-              <li key={x} className="border border-line px-2.5 py-1.5">
-                {x}
-              </li>
-            ))}
+            {["Latest holdings per ETF", "Dollar-weighted", "Weights in %, differences in pp", "Whole-dollar moves"].map(
+              (x) => (
+                <li key={x} className="border border-line px-2.5 py-1.5">
+                  {x}
+                </li>
+              ),
+            )}
           </ul>
         </div>
       </header>
@@ -99,273 +92,283 @@ export default function MethodologyPage() {
           </details>
 
           <div className="max-w-[760px]">
+            <DocSection id="overview" index={n("overview")} title={t("overview")}>
+              <Bullets>
+                <li>
+                  You enter the ETFs you hold and the dollars in each, for example IVV $6,000, IYW $3,000 and ARKK
+                  $1,000.
+                </li>
+                <li>
+                  Each ETF&apos;s latest published holdings are grouped by sector, by market value. Your{" "}
+                  <Term>sector mix</Term> is those ETF mixes blended by your dollars.
+                </li>
+                <li>
+                  You set a <Term>target mix</Term> with sliders, or in plain words that the assistant turns into
+                  numbers. The target is always yours: {BRAND} never suggests one.
+                </li>
+                <li>
+                  {BRAND} finds <Term>plans</Term>: the closest mix it can reach using only the moves each plan allows.
+                  Every plan shows how close it gets and how much money moves.
+                </li>
+              </Bullets>
+            </DocSection>
+
             <DocSection id="units" index={n("units")} title={t("units")}>
-              <p>
-                Every weight, exposure, drift and effect is a <Term>fraction</Term> in the database and the API:{" "}
-                <C>0.07</C> means 7%. Only the interface converts, and it uses two different units on purpose.
-              </p>
               <Bullets>
                 <li>
-                  <Term>Levels</Term> are shown in %: a weight of 30.0%, a top-2 share of 60.0%.
+                  <Term>Weights</Term>, how much of something sits in a sector, are shown in %: Technology 52.6%.
                 </li>
                 <li>
-                  <Term>Differences</Term> between two weights are shown in percentage points, <Term>pp</Term>: a drift
-                  of +5.0 pp, never &ldquo;+5%&rdquo;.
+                  <Term>Differences</Term> between two weights are shown in percentage points, <Term>pp</Term>: going
+                  from 52.6% to 47.6% is &minus;5.0 pp, never &ldquo;&minus;5%&rdquo; (which would mean 5% of 52.6%).
+                  Distances are in pp too.
                 </li>
-                <li>
-                  A change in a share count is a ratio, not a weight, so it is shown in %: a flow-adjusted share count
-                  of +50.0%.
-                </li>
+                <li>Money is in dollars, and plan amounts are whole dollars.</li>
               </Bullets>
               <p>
-                Everything is computed in float64 and rounded only for display. Only equity rows enter the weights.
-                Cash and other non-equity rows are excluded and reported separately as the cash weight.
+                Behind the scenes every weight is a fraction (<C>0.526</C> means 52.6%), computed at full precision and
+                rounded only for display, so a column of rounded weights may not add up to exactly 100.0%.
               </p>
             </DocSection>
 
-            <DocSection id="vectors" index={n("vectors")} title={t("vectors")}>
+            <DocSection id="etf-mix" index={n("etf-mix")} title={t("etf-mix")}>
               <p>
-                For snapshots A (earlier) and B (later), each weight vector is normalized over its own equity total.
-                Here <C>s</C> is a share count, <C>p</C> a price and <C>mv</C> a market value.
+                Each ETF uses its <Term>latest stored holdings snapshot</Term>. Every holding is put in a sector, and a
+                sector&apos;s weight is the market value of its holdings over the ETF&apos;s total market value. Only
+                rows with a positive market value count.
               </p>
-              <Formula label="Weight vectors">{`w0[i]  = mv_A[i]  / Σ mv_A       earlier weights
-w1[i]  = mv_B[i]  / Σ mv_B       later weights
-wcf[i] = mv_cf[i] / Σ mv_cf      counterfactual weights
+              <Formula label="ETF sector mix">{`etf_mix[s] = Σ market value of holdings in sector s
+             ÷ Σ market value of all holdings
 
-mv_cf[i] = s_A[i] × p_B[i]       A's share counts at B's prices`}</Formula>
+(holdings with a positive market value only)`}</Formula>
               <p>
-                The <Term>counterfactual</Term> <C>wcf</C> is the portfolio the fund would have had at the later date if
-                no share count had changed. Three rules complete it:
+                A holding&apos;s sector comes from a maintained reference list for that security, then from the
+                issuer&apos;s own sector column, then <Term>Unclassified</Term>. Issuers spell sectors differently, so
+                their labels are mapped to the 11 standard sectors. Anything that isn&apos;t a stock, such as cash,
+                money-market funds, futures or warrants, goes to <Term>Cash &amp; other</Term>.
               </p>
-              <Bullets>
-                <li>
-                  <Term>Removed holdings</Term> (only in A) have no later price, so the earlier price <C>p_A</C> is used
-                  and the holding is marked <em>price estimated</em>.
-                </li>
-                <li>
-                  <Term>Added holdings</Term> (only in B) count as 0: nothing was held at the start.
-                </li>
-                <li>
-                  <Term>Suspected splits</Term> use <C>s_A × r</C> instead of <C>s_A</C>, where <C>r</C> is the detected
-                  ratio (see {t("splits")}).
-                </li>
-              </Bullets>
-            </DocSection>
-
-            <DocSection id="decomposition" index={n("decomposition")} title={t("decomposition")}>
-              <Formula label="Decomposition">{`price_effect[i]    = wcf[i] − w0[i]
-activity_effect[i] = w1[i]  − wcf[i]
-
-price_effect + activity_effect = w1 − w0      (always, exactly)`}</Formula>
-              <p>
-                The price effect is what market moves alone would have done to a weight. Portfolio activity is the rest:
-                the part that comes from different share counts. Because both are measured against the same
-                counterfactual, they add back to the total change with nothing left over.
-              </p>
-              <Formula label="Worked example · DEMO, BBB, 2026-10-01 → 2026-10-02">{`A   200 shares × $5 = $1,000 of $4,000   w0  = 25.0%
-CF  200 shares × $5 = $1,000 of $4,500   wcf = 22.2%
-B   300 shares × $5 = $1,500 of $5,000   w1  = 30.0%
-
-price effect        22.2% − 25.0%  =  −2.8 pp
-portfolio activity  30.0% − 22.2%  =  +7.8 pp
-total change                          +5.0 pp`}</Formula>
-              <p>
-                BBB&apos;s own price did not move, yet its price effect is negative: AAA rose 50%, so in the
-                counterfactual it takes a bigger share of the portfolio and everything else shrinks.
-              </p>
-            </DocSection>
-
-            <DocSection id="flow" index={n("flow")} title={t("flow")}>
-              <p>
-                When investors create or redeem ETF shares, the fund scales every position&apos;s share count together.
-                That is not a manager decision, so it is measured and removed before any position is classified.
-              </p>
-              <Formula label="Flow factor">{`flow_factor         = median( s_B[i] / s_A[i] )      holdings in both, s_A > 0
-adj_share_change[i] = (s_B[i] / s_A[i]) / flow_factor − 1`}</Formula>
-              <Bullets>
-                <li>
-                  With fewer than <C>3</C> holdings present in both snapshots, the flow factor falls back to{" "}
-                  <C>1.0</C> and a caveat warns that fund flows may show up as portfolio activity.
-                </li>
-                <li>
-                  In the FLOW test fund every share count rises 10%. The flow factor is 1.10, every flow-adjusted share
-                  change is 0, and no events fire.
-                </li>
-              </Bullets>
-            </DocSection>
-
-            <DocSection id="splits" index={n("splits")} title={t("splits")}>
-              <p>
-                A share count that doubles while the price halves is a stock split, not a position change. It is
-                flagged as a <Term>suspected corporate action</Term> when both conditions hold:
-              </p>
-              <Formula label="Split rule">{`r = (s_B / s_A) / flow_factor
-
-flag when   r or 1/r is within 1% of 2, 3, 4, 5, 10 or 20
-      and   (p_B / p_A) × r is within 10% of 1`}</Formula>
-              <p>
-                A flagged holding uses <C>s_A × r</C> in the counterfactual, gets a flow-adjusted share change of 0 and
-                the status unchanged, and never produces a position event. A{" "}
-                <C>SUSPECTED_CORPORATE_ACTION</C> event and a caveat point to it instead. In the SPLT test fund, FFF
-                goes from 100 to 200 shares while its price moves from $50.00 to $25.50: <C>r = 2.00</C> and{" "}
-                <C>(25.5 / 50) × 2 = 1.02</C>, so it is a suspected 2-for-1 split.
-              </p>
-            </DocSection>
-
-            <DocSection id="status" index={n("status")} title={t("status")}>
               <DocTable
-                head={["Status", "Rule"]}
+                head={["Sector", "Issuer labels mapped to it"]}
                 rows={[
-                  ["Added", "Only in B"],
-                  ["Removed", "Only in A"],
-                  ["Increased position", "Flow-adjusted share change ≥ +5%"],
-                  ["Decreased position", "Flow-adjusted share change ≤ −5%"],
-                  ["Unchanged", "Otherwise, including suspected splits"],
+                  ["Technology", "Information Technology, Technology"],
+                  ["Health Care", "Health Care, Healthcare"],
+                  ["Financials", "Financials, Financial"],
+                  ["Consumer Discretionary", "Consumer Discretionary, Consumer Cyclical"],
+                  ["Consumer Staples", "Consumer Staples, Consumer Defensive"],
+                  ["Communication Services", "Communication Services, Communications, Telecommunications"],
+                  ["Industrials", "Industrials"],
+                  ["Energy", "Energy"],
+                  ["Utilities", "Utilities"],
+                  ["Materials", "Materials, Basic Materials"],
+                  ["Real Estate", "Real Estate"],
+                  ["Cash & other", "Every row that isn't a stock, and “Cash and/or Derivatives”"],
+                  ["Unclassified", "Stocks with no sector label from any source"],
                 ]}
               />
+            </DocSection>
+
+            <DocSection id="portfolio-mix" index={n("portfolio-mix")} title={t("portfolio-mix")}>
               <p>
-                An <Term>increased position</Term> or <Term>decreased position</Term> always means a flow-adjusted
-                share-count change between two snapshots. It says what changed, not why.
+                Your portfolio&apos;s mix is the <Term>dollar-weighted blend</Term> of your ETFs&apos; mixes: each
+                ETF&apos;s sector weights times the dollars in it, over the total. ETFs without holdings data are left
+                out, so the mix describes the part of your money that {BRAND} can see.
+              </p>
+              <Formula label="Your sector mix">{`your_mix[s] = Σ  dollars[etf] × etf_mix[etf][s]
+              ÷ Σ  dollars[etf]
+
+(ETFs with holdings data only)`}</Formula>
+              <p>
+                Example, with IVV $6,000, IYW $3,000 and ARKK $1,000 (60%, 30% and 10% of the money) and the holdings
+                files of October 15&ndash;16, 2026:
+              </p>
+              <Formula label="Technology, worked out">{`Technology = 0.6 × 38.3%   (IVV)
+           + 0.3 × 90.3%   (IYW)
+           + 0.1 × 24.9%   (ARKK)
+           = 23.0% + 27.1% + 2.5%  =  52.6%`}</Formula>
+            </DocSection>
+
+            <DocSection id="distance" index={n("distance")} title={t("distance")}>
+              <p>
+                The <Term>distance</Term> between your mix and your target is half the sum of the absolute differences,
+                sector by sector. It reads as the share of your portfolio sitting in a different sector than you want:
+                0.0 pp is a perfect match, and 100 pp would mean none of it is where you want it.
+              </p>
+              <Formula label="Distance">{`distance = ½ × Σ | your_mix[s] − target[s] |`}</Formula>
+              <p>
+                Example: Technology 52.6% with a target of 47.6%, and Health Care 8.4% with a target of 13.4%, give ½ ×
+                (5.0 + 5.0) = 5.0 pp. Five cents of every dollar sit in a different sector than you want.
               </p>
             </DocSection>
 
-            <DocSection id="dilution" index={n("dilution")} title={t("dilution")}>
+            <DocSection id="plans" index={n("plans")} title={t("plans")}>
               <p>
-                An unchanged holding can still have nonzero portfolio activity. When other positions grow, shrink,
-                arrive or leave, its share of the portfolio moves even though its own share count did not. That part is
-                labelled <Term>dilution</Term>, never a position change.
+                A plan is a new dollar amount for each ETF. Which moves a plan may use depends on whether you are adding
+                money, taking money out, or neither; each situation gets two plans.
               </p>
-              <p>
-                In DEMO, AAA and DDD are unchanged, yet their portfolio activity is −3.3 pp and −2.2 pp: BBB was
-                increased, CCC removed and EEE added around them.
-              </p>
-            </DocSection>
-
-            <DocSection id="sectors" index={n("sectors")} title={t("sectors")}>
-              <p>
-                Each holding&apos;s sector comes from the reference mapping in <C>data/reference/sectors.csv</C>, then
-                the issuer&apos;s own sector column if the file has one, then <C>Unknown</C>. The mapping is applied at
-                analysis time to both snapshots, so editing it never shows up as drift. Unknown is a real bucket: it is
-                shown like any other sector and raises a caveat.
-              </p>
-              <Formula label="Per sector">{`drift            = w1 − w0 = price_effect + activity_effect
-activity_effect  = activity_direct + activity_dilution
-
-activity_direct    sum over holdings that were added, removed,
-                   increased or decreased
-activity_dilution  sum over unchanged holdings`}</Formula>
-              <p>
-                Each sector also reports <C>w0</C>, <C>wcf</C> and <C>w1</C>. In DEMO, Technology&apos;s net drift is
-                0.0 pp, but that hides +5.6 pp from price and −5.6 pp of portfolio activity, all of it dilution. The
-                sector labels for ARKK are team-assigned categories, not an official classification such as GICS.
-              </p>
-            </DocSection>
-
-            <DocSection id="concentration" index={n("concentration")} title={t("concentration")}>
-              <Formula label="Concentration">{`top_N_share = sum of the N largest weights
-HHI         = Σ w[i]²`}</Formula>
-              <p>
-                Both are computed on <C>w0</C>, <C>wcf</C> and <C>w1</C>, so a change in concentration splits into price
-                and portfolio activity like any weight. N is 10, except for DEMO, which uses 2: it has only four
-                holdings, so a top-10 share would always be 100%. In DEMO the top-2 share goes from 50.0% to 60.0%:
-                +10.0 pp (price +5.6 pp, portfolio activity +4.4 pp).
-              </p>
-            </DocSection>
-
-            <DocSection id="events" index={n("events")} title={t("events")}>
               <DocTable
-                head={["Event", "Fires when", "Magnitude"]}
+                head={["Situation", "Plan", "Allowed moves"]}
                 rows={[
-                  [<C key="a">POSITION_ADDED / _REMOVED</C>, "Always", "Activity effect"],
+                  ["No money in or out", "Rearrange the ETFs you own", "Increase and reduce the ETFs you hold"],
+                  ["", "Rearrange and add new ETFs", "The same, plus add new ETFs"],
                   [
-                    <C key="i">POSITION_INCREASED / _DECREASED</C>,
-                    "|flow-adjusted share change| ≥ 5% and |activity effect| ≥ 0.1 pp",
-                    "Activity effect",
+                    "Adding money",
+                    "Invest without reducing anything",
+                    "Increase ETFs you hold or add new ones; every ETF you hold stays at least where it is",
                   ],
-                  [<C key="s">SECTOR_INCREASE / _DECREASE</C>, "|drift| ≥ 1.0 pp", "Drift"],
-                  [<C key="c">CONCENTRATION_INCREASE / _DECREASE</C>, "|top-N share change| ≥ 1.0 pp", "Top-N share change"],
-                  [<C key="x">SUSPECTED_CORPORATE_ACTION</C>, "The split rule above", "Ratio r"],
+                  ["", "Invest and rearrange", "Any of the moves, including new ETFs"],
+                  ["Taking money out", "Take out only by reducing", "Reduce ETFs you hold; nothing is increased or added"],
+                  ["", "Take out and rearrange", "Any of the moves, including new ETFs"],
                 ]}
               />
               <p>
-                Every event carries a plain-language description with its price and portfolio-activity split, following
-                one template:
+                You choose how many new ETFs a plan may add; the default is 2. If you hold nothing yet and add money,
+                there is one plan, which picks ETFs up to that limit. Each plan is built in the same steps:
               </p>
-              <Formula label="Description template">{`Health Care exposure +5.0 pp (price −2.8 pp, portfolio activity +7.8 pp)`}</Formula>
-              <p>
-                Event IDs are deterministic. The same fund, dates and config always give the same IDs, so links and
-                notes stay valid across re-ingests:
-              </p>
-              <Formula label="Event ID">{`id = first 16 hex characters of
-     sha256("fund|from|to|type|subject|CONFIG_VERSION")`}</Formula>
-              <p>
-                Contributing holdings are the security itself for position and split events, the sector&apos;s
-                holdings ordered by the size of their weight change for sector events, and the top-N holdings in{" "}
-                <C>w1</C> for concentration events. All thresholds live in one file, and changing any of them means
-                bumping <C>CONFIG_VERSION</C>, which changes every ID:
-              </p>
-              <Formula label="backend/analytics/config.py">{CONFIG}</Formula>
-            </DocSection>
-
-            <DocSection id="caveats" index={n("caveats")} title={t("caveats")}>
-              <p>Each comparison returns plain-language caveats, shown next to the results, when:</p>
               <Bullets>
                 <li>
-                  the range spans more than one stored snapshot interval: changes are netted, and position changes that
-                  reversed within the period are invisible;
+                  <Term>Shortlist.</Term> Only plain, widely held index and sector ETFs (from SPDR, Vanguard, iShares
+                  and similar) whose holdings are at least 80% classified can be suggested. Those you don&apos;t hold are
+                  scored by how well their sector mix points toward what your portfolio is missing; the top 12 are the
+                  candidates.
                 </li>
-                <li>any holding&apos;s price was estimated (a removed holding has no later price);</li>
-                <li>any suspected corporate action was flagged;</li>
-                <li>the flow factor fell back to 1.0;</li>
-                <li>any weight sits in the Unknown sector.</li>
+                <li>
+                  <Term>Only plain ETFs get more money.</Term> An ETF you hold that isn&apos;t on that list, such as a
+                  thematic or active fund, still counts in your mix and can be kept or reduced, but no plan increases it.
+                </li>
+                <li>
+                  <Term>Closest mix.</Term> For a set of ETFs, {BRAND} finds the split of your money whose mix is
+                  closest to your target within the plan&apos;s rules. &ldquo;Closest&rdquo; here means the smallest sum
+                  of squared sector differences, which prefers several small misses to one big one. When two splits are
+                  equally close, the one with smaller moves wins.
+                </li>
+                <li>
+                  <Term>New ETFs, one at a time.</Term> The candidate that helps most is added first, then the next. Each
+                  joins only if it brings the plan at least 0.5 pp closer to your target, and no plan goes over your limit.
+                </li>
+                <li>
+                  <Term>No slivers.</Term> A new ETF that would end up under 1% of the portfolio is dropped and the plan
+                  is worked out again. In plans that may both increase and reduce, an ETF you hold that would end up
+                  under 1% is removed rather than kept as a sliver.
+                </li>
+                <li>
+                  <Term>Whole dollars.</Term> Amounts are rounded to whole dollars, changes under $1 are skipped, and any
+                  rounding leftover goes to the largest move.
+                </li>
               </Bullets>
+              <p>
+                Each plan lists its moves as <Term>add</Term>, <Term>increase</Term>, <Term>reduce</Term> or{" "}
+                <Term>remove</Term> (reduce to zero), the distance before and after, and the money moved out of your
+                current holdings. If two plans come out the same, for example because no new ETF helps, only one is
+                shown. ETFs you hold without holdings data are never part of a plan; they stay exactly as they are.
+              </p>
+              <Formula label="backend/analytics/rebalance.py">{PLANNER_CONFIG}</Formula>
+            </DocSection>
+
+            <DocSection id="assistant" index={n("assistant")} title={t("assistant")}>
+              <p>
+                The assistant is Claude, a model made by Anthropic. Its only job is to turn what you type into a
+                target mix and, when you mention one, an amount of money you&apos;re adding or taking out. The plans
+                themselves always come from the math above, never from the model.
+              </p>
+              <Bullets>
+                <li>
+                  It starts from your current target, or your current mix if you haven&apos;t set one, changes only
+                  what you asked for, and spreads any difference over the other sectors in proportion to their size, so
+                  the total stays 100%.
+                </li>
+                <li>
+                  Everyday words are read as rough sizes: &ldquo;a bit&rdquo; is about 3 pp, &ldquo;more&rdquo; or
+                  &ldquo;less&rdquo; about 5 pp, &ldquo;a lot&rdquo; about 10 pp, and &ldquo;no energy&rdquo; means
+                  0%. It always shows the result, so you can adjust it.
+                </li>
+                <li>
+                  It never suggests what mix you should want, never says a sector is a good or bad idea, and never
+                  predicts markets. Asked for advice, it says the choice is yours and offers to explain what a sector
+                  contains.
+                </li>
+                <li>
+                  It sees your current sector mix, your target, your portfolio&apos;s total value and the last few
+                  messages, nothing else: not which ETFs you hold, and nothing about who you are.
+                </li>
+              </Bullets>
+              <p>
+                The sliders work without the assistant. If Claude isn&apos;t available, a simple built-in reader still
+                handles plain requests such as &ldquo;less tech&rdquo;, &ldquo;no energy&rdquo; or &ldquo;30% health
+                care&rdquo;.
+              </p>
             </DocSection>
 
             <DocSection id="sources" index={n("sources")} title={t("sources")}>
+              <DocTable
+                head={["Source", "What it gives", "How fresh"]}
+                rows={[
+                  [
+                    "ARK Invest holdings file",
+                    "Every holding with shares and market value. Sectors come from the reference list.",
+                    "The latest market day when fetched",
+                  ],
+                  [
+                    "iShares holdings files",
+                    "Every holding with market value and the issuer's own sector",
+                    "The latest market day when fetched",
+                  ],
+                  [
+                    "SEC N-PORT filings",
+                    "Holdings that funds report to the SEC, for many more ETFs. No sector field.",
+                    "Published with a delay; can be a few months old",
+                  ],
+                  ["Nasdaq symbol directories", "The list of U.S.-listed ETFs you can search", "No holdings"],
+                ]}
+              />
               <p>
-                <Term>ARK Invest.</Term> ARK Innovation ETF (ARKK) is read from ARK&apos;s daily holdings CSV:
+                Each ETF uses its own newest snapshot, so ETFs in one portfolio can have different dates, and two
+                sources are never mixed inside one snapshot. Issuer files describe the previous market day at best, so
+                expect a lag of a day or more. ARK&apos;s file is read from:
               </p>
               <Formula>{ARK_CSV_URL}</Formula>
+              <p>
+                Every file is checked row by row before it is stored, and each snapshot keeps its source address, date
+                and a fingerprint of its contents. The searchable ETF list is much larger than the set with holdings:
+                an ETF without holdings data can be added to your portfolio, but it is flagged and left out of the math.
+              </p>
+            </DocSection>
+
+            <DocSection id="saving" index={n("saving")} title={t("saving")}>
+              <p>
+                There are no accounts. Your ETFs, amounts and target save automatically under a random link, and this
+                browser keeps a private <Term>edit key</Term> for it. The server stores only a fingerprint of the key,
+                never the key itself.
+              </p>
               <Bullets>
-                <li>
-                  The file covers only the latest market day, so history is built by fetching it on different days. The
-                  first stored snapshot is dated 2026-10-16; a comparison needs a second one.
-                </li>
-                <li>
-                  Weights arrive in percent and the ARK adapter converts them to fractions. The file has no price,
-                  sector or asset-class column: price is derived from market value and share count, money-market funds
-                  and cash are classed as cash, warrants and rights as other, and everything else as equity, including
-                  private placements with pseudo-CUSIPs and no ticker.
-                </li>
+                <li>Anyone with the link can see the saved portfolio.</li>
+                <li>Only a browser holding the edit key can change or delete it.</li>
+                <li>Opening someone else&apos;s link and making changes saves them as your own copy.</li>
+                <li>If you clear this browser&apos;s site data, the key goes with it and the portfolio can no longer be changed.</li>
               </Bullets>
-              <p>
-                <Term>Synthetic test funds.</Term> Three small fixtures with known answers back the test suite and the
-                demo: <C>DEMO</C> (four holdings, with one position added, one removed and one increased), <C>SPLT</C>{" "}
-                (a 2-for-1 split that must not count as portfolio activity) and <C>FLOW</C> (every share count +10%,
-                pure fund flow, no events).
-              </p>
-              <p>
-                <Term>Ingest.</Term> Every file goes adapter → validate → normalize → load in one transaction. The
-                content hash is sha256 over the normalized rows, so formatting differences in the raw file never change
-                it. Loading the same file again is a no-op, different content for a stored date is rejected unless it
-                is explicitly replaced, and any failure rolls back the whole snapshot. New issuers are added by writing
-                an adapter.
-              </p>
             </DocSection>
 
             <DocSection id="limitations" index={n("limitations")} title={t("limitations")}>
               <Bullets>
-                <li>Snapshot comparisons can&apos;t see position changes that reversed within the period.</li>
                 <li>
-                  The median flow factor misreads periods where the manager changes most positions in the same
-                  direction.
+                  Taxes, fees, transaction costs and bid-ask spreads are not considered. Reducing an ETF can have tax
+                  consequences.
                 </li>
-                <li>Removed holdings use the earlier price in the counterfactual.</li>
-                <li>Split detection is a heuristic. Mergers, spin-offs and ticker reuse are not modeled.</li>
-                <li>Sector labels are team-assigned, not an official classification.</li>
                 <li>
-                  Issuer files usually show only the current day, so real history exists only from the first fetch
-                  onward.
+                  Holdings lag by a day or more (N-PORT by months), and funds change their holdings over time, so your
+                  real mix today can differ.
+                </li>
+                <li>ETFs without holdings data are flagged and kept out of the mix and the plans.</li>
+                <li>
+                  Sector labels come from issuers and a reference list, not one official classification across all
+                  sources. ARK&apos;s sectors are assigned by the team; N-PORT holdings may be Unclassified.
+                </li>
+                <li>
+                  The mix is by sector only. It says nothing about company size, country, or whether two ETFs hold the
+                  same companies within a sector.
+                </li>
+                <li>
+                  Plans are in dollars, not shares, and don&apos;t check minimums or whole-share rules. They only use
+                  ETFs that have holdings data.
                 </li>
               </Bullets>
               <p className="rounded-md border border-line bg-panel px-4 py-3 text-[15px] text-fg/85">{DISCLAIMER}</p>

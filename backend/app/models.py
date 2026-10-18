@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Date, DateTime, Double, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, Double, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -60,6 +60,56 @@ class Holding(Base):
     reported_weight: Mapped[float | None] = mapped_column(Double, nullable=True)
 
 
+class ProviderHoldingsSnapshot(Base):
+    """Weight-only snapshot from an external holdings provider (kept apart from N-PORT rows)."""
+    __tablename__ = "provider_holdings_snapshots"
+    __table_args__ = (UniqueConstraint("provider", "fund_ticker", "as_of_date", "content_hash"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    fund_ticker: Mapped[str] = mapped_column(String(16), index=True)
+    fund_name: Mapped[str] = mapped_column(String(200))
+    as_of_date: Mapped[date] = mapped_column(Date)
+    source_layer: Mapped[str] = mapped_column(String(32))
+    source_url: Mapped[str] = mapped_column(String(500))
+    cite_as: Mapped[str] = mapped_column(Text, default="")
+    content_hash: Mapped[str] = mapped_column(String(64))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProviderHolding(Base):
+    __tablename__ = "provider_holdings"
+    __table_args__ = (UniqueConstraint("snapshot_id", "ticker"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("provider_holdings_snapshots.id", ondelete="CASCADE"), index=True
+    )
+    # TickerInside may use a full fixed-income/security description when the
+    # holding has no equity ticker (for example, a CLO tranche).
+    ticker: Mapped[str] = mapped_column(Text)
+    weight: Mapped[float] = mapped_column(Double)
+
+
+class SecurityPrice(Base):
+    """Daily OHLCV price bar, with source feed recorded for data provenance."""
+    __tablename__ = "security_prices"
+    __table_args__ = (UniqueConstraint("provider", "feed", "adjustment", "ticker", "as_of_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    feed: Mapped[str] = mapped_column(String(16))
+    adjustment: Mapped[str] = mapped_column(String(16), default="all")
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    open: Mapped[float] = mapped_column(Double)
+    high: Mapped[float] = mapped_column(Double)
+    low: Mapped[float] = mapped_column(Double)
+    close: Mapped[float] = mapped_column(Double)
+    volume: Mapped[float] = mapped_column(Double)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class ImportLog(Base):
     __tablename__ = "import_log"
 
@@ -99,3 +149,18 @@ class PortfolioFund(Base):
     portfolio_id: Mapped[str] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"))
     fund_id: Mapped[int] = mapped_column(ForeignKey("funds.id"))
     weight: Mapped[float] = mapped_column(Double)
+
+
+class PortfolioPreference(Base):
+    """What the user told the planner: the portfolio's dollar value and the sector mix they want.
+
+    A separate table so the existing portfolio tables stay unchanged (no migrations).
+    """
+
+    __tablename__ = "portfolio_preferences"
+
+    portfolio_id: Mapped[str] = mapped_column(
+        ForeignKey("portfolios.id", ondelete="CASCADE"), primary_key=True)
+    total_value: Mapped[float | None] = mapped_column(Double, nullable=True)
+    target: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # sector -> fraction
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

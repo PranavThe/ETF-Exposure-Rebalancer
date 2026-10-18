@@ -1,11 +1,15 @@
 # FundShift
 
-FundShift shows how an actively managed ETF's portfolio changed between two dates. It separates
-changes caused by **price movement** from changes caused by **portfolio activity** (the manager
-changing share counts).
+FundShift is a one-screen sector-exposure tool for beginner investors. You enter the ETFs you hold
+and the dollars in each; it shows your look-through sector mix (built from each ETF's published
+holdings). You choose the mix you want, with sliders or by telling the assistant in plain words, and
+it suggests the moves that get you there: reduce or increase ETFs you hold, add new ones, add money
+or take money out.
 
-> On the surface, X happened. Underneath, price moves did A and portfolio activity did B. Here are
-> the positions that actually changed, and here is the source data that proves it.
+> You decide the exposure you want. The tool only does the math to get you there.
+
+The original holdings-change analysis (price effect vs portfolio activity) is still served by the
+API; see "Holdings-change analysis" below.
 
 `SPEC.md` is the build spec. `CLAUDE.md` holds the working conventions.
 
@@ -16,52 +20,86 @@ Requires Python 3.11+ and Node 20+.
 ```
 make setup    # .venv + requirements-dev.txt, npm install in frontend/
 make test     # pytest: analytics, pipeline and API suites
-make demo     # reset the DB, ingest data/sample and data/raw, start the API on :8000
+make demo     # reset the local DB, ingest local test fixtures and data/raw, start the API on :8000
 make web      # second terminal: frontend on http://localhost:3000
 ```
 
 `make demo` needs no network. The frontend reads `NEXT_PUBLIC_API_URL` (default
 `http://localhost:8000`).
 
-### Demo walkthrough
+### Walkthrough
 
-1. `make demo`, `make web`, then open http://localhost:3000 (the landing page) and click **Launch app**,
-   or go straight to http://localhost:3000/terminal. In the terminal sidebar pick **DEMO**, from
-   2026-10-01 to 2026-10-02.
-2. Technology's net drift is 0.0 pp, but the **Sectors** chart and tab show it hides +5.6 pp from
-   price and −5.6 pp from dilution. Health Care is +5.0 pp, driven by an increased BBB position. CCC
-   was removed and EEE was added.
-3. Click an event. Its contributing holdings are highlighted in the **Holdings** tab, the
-   **Inspector** explains it, and the **Source** tab shows both snapshots' files and content hashes,
-   with links to the raw `/holdings` JSON.
-4. Re-run `make ingest-sample`. It prints `already ingested`, and the event IDs are unchanged.
-5. **SPLT**: FFF's share count doubled, but it is flagged as a suspected split, not an increased position.
-6. **FLOW**: every share count rose 10%. There are no events, because that was fund flow.
-7. **ARKK**: real issuer data (see below). It needs two snapshots before a comparison is possible;
-   its holdings are on the **Fund** page.
+1. `make demo`, `make web`, then open http://localhost:3000/app.
+2. Click **Try an example portfolio** (IVV $6,000, IYW $3,000, ARKK $1,000 when those ETFs have
+   holdings loaded), or search for your own ETFs and type the dollars in each.
+3. The middle panel shows your sector mix. Drag a sector's slider to set the mix you want; the
+   sectors you haven't touched adjust so the total stays 100%. Or tell the assistant, for example
+   "less tech, more health care" or "no energy".
+4. The right panel shows the suggested moves for each kind of plan, how close each gets (in pp)
+   and how much money moves. Choose **Add** or **Take out** to plan with new money or a withdrawal,
+   and **New ETFs** to limit how many new ETFs a plan may add. **Use these amounts** applies a plan
+   to your ETFs so you can see the result.
+5. Your portfolio saves to the database automatically; the URL (`/app?p=<id>`) reopens it, and only
+   the browser that created it can edit it. Opening someone else's link and changing it saves a copy.
+
+The iShares funds in the example are loaded locally with `scripts/ingest_ishares.py` (see
+[ETF data sources](docs/etf-sources.md)); `make demo` alone loads only ARKK, plus the synthetic
+DEMO, SPLT and FLOWTEST fixtures, which the app never suggests.
 
 ## Frontend
 
-A dark, terminal-style Next.js app (layout modelled on the Kairos terminal) plus a marketing site in
-the same project:
+A dark, terminal-style Next.js app (modelled on the Kairos terminal) plus a marketing site (modelled
+on kairos.trade) in the same project:
 
 | Route | What it shows |
 |---|---|
-| `/` | Landing page: what the product does, with the real DEMO numbers and a product screenshot |
-| `/methodology` | Every formula, rule and threshold behind the numbers |
-| `/discover` | Up to 24 loaded funds: featured comparison, latest events, largest weight changes, fund cards |
-| `/portfolio` | Create and edit weighted ETF portfolios; latest holdings, exposure, overlap, and coverage |
-| `/terminal` | The analysis desk: sector chart, events, inspector, holdings, sources and caveats |
-| `/fund` | One fund: snapshot calendar (pick two days to compare), sources, holdings at a date |
-| `/movers` | Positions ranked by portfolio activity across funds |
+| `/` | Landing page for the exposure tool |
+| `/methodology` | How exposure, distance and plans are computed, data sources and limitations |
+| `/app` | The whole product on one screen: your ETFs, your sector mix vs your target, suggested moves, assistant |
 
-Views keep their selection in the URL (`/terminal?fund=DEMO&from=2026-10-01&to=2026-10-02`), so
-every view can be shared as a link. The product name lives in `frontend/lib/brand.ts`. Geist and
-Geist Mono are bundled in `frontend/app/fonts` (SIL Open Font License), so builds need no network.
+The app lives in `frontend/components/planner` with its API calls in `frontend/lib/planner.ts`.
+The product name lives in `frontend/lib/brand.ts`. Geist and Geist Mono are bundled in
+`frontend/app/fonts` (SIL Open Font License), so builds need no network.
 
-## How the numbers work
+## How the planner works
 
-Every weight, exposure, drift and effect is a **fraction** in code, the database and the API
+All weights are fractions in code and the API; the frontend shows % for levels and pp for
+differences.
+
+- **An ETF's sector mix** comes from its latest stored snapshot: market value by sector over total
+  positive market value. Non-equity rows count as "Cash & other". Issuer labels are mapped to 11
+  standard sectors (`backend/analytics/rebalance.py`, `SECTOR_ALIASES`).
+- **Holdings without a sector** (SEC N-PORT rows carry only a CUSIP and a name) get one from the
+  company name: `normalize_company_name` turns "Alphabet, Inc., Class A", "ALPHABET INC-A" and
+  "ALPHABET CLASS A" into `alphabet`, which is looked up in `data/reference/name_sectors.csv`
+  (built by `scripts/build_name_sectors.py` from iShares holdings files, which do carry sectors).
+  A holding still unclassified then takes the sector its CUSIP has in one of the suggestable ETFs.
+  Whatever is left shows as "Unclassified".
+- **Suggested ETFs** come only from a short allowlist of plain, liquid index ETFs
+  (`SUGGESTABLE_ETFS` in `rebalance.py`) whose mix is at least 80% classified. You can hold any ETF;
+  it counts in your mix, but leveraged, inverse, single-stock or
+  obscure funds are never proposed. `GET /etfs/covered` lists the allowlisted ETFs with data.
+- **Held ETFs off that list** (thematic or active funds, for example) still count in your mix and can
+  be kept or reduced, but no plan puts more money into them.
+- **Your exposure** is the dollar-weighted blend of your ETFs' mixes. ETFs without holdings data are
+  listed as `missing`, kept as they are, and left out of the mix and the moves.
+- **Distance** between two mixes is half the sum of absolute differences (0 = identical, 1 = no
+  overlap), shown in pp.
+- **Plans** solve for the dollar split closest to your target (a small quadratic program over the
+  allowed ETFs, solved exactly). Each kind restricts the moves: rearrange only what you own;
+  rearrange and add new ETFs; invest new money without reducing anything; take money out only by
+  reducing; or the same with rearranging. New ETFs are added one at a time, each only if it brings
+  the plan at least 0.5 pp closer; positions under 1% of the portfolio are dropped; amounts are
+  whole dollars. Plans that change nothing or repeat another plan are not shown.
+- **The assistant** (`POST /chat`) asks Claude Haiku 5.5 (`claude-haiku-5-5`, JSON-schema output, effort `low`) to turn the
+  message into a full target mix and, if mentioned, money added or taken out. It never picks a mix
+  for the user. Without `ANTHROPIC_API_KEY`, or if the call fails, a small rule-based reader handles
+  plain requests ("less tech", "no energy", "30% financials", "I'm adding $2,000"). Sliders always work.
+
+## Holdings-change analysis
+
+The API still serves the original analysis of how an active ETF changed between two snapshots
+(`/funds/{ticker}/changes`); the app no longer shows it. Every weight, exposure, drift and effect is a **fraction** in code, the database and the API
 (0.07 = 7%). Only the frontend converts to % (levels) or pp (differences).
 
 For snapshots A (earlier) and B (later), equity rows only:
@@ -91,7 +129,7 @@ python scripts/run_pipeline.py --fund DEMO --file data/sample/demo_2026-10-01.cs
 ```
 
 Adapter → validate → normalize → load, in one transaction. The adapter defaults to `ark` for ARKK
-and to `sample` otherwise.
+and to `sample` only for the local fixture tickers. Other funds must name their adapter explicitly.
 
 | Outcome | Exit code | When |
 |---|---|---|
@@ -138,6 +176,8 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 | `GET /funds/{ticker}/snapshots` | dates with `source_url, content_hash, row_count, ingested_at` |
 | `GET /funds/{ticker}/holdings?date=YYYY-MM-DD` | the stored rows with resolved sectors (the "view underlying data" link) |
 | `GET /funds/{ticker}/changes?from=&to=` | the full comparison; 404 for an unknown fund or date, 422 when `from ≥ to` |
+| `GET /provider-data/funds/{ticker}/holdings` | latest TickerInside weights and changes from the prior source date |
+| `GET /provider-data/prices?symbols=AAPL,MSFT` | latest stored Alpaca IEX daily bars; `as_of`, `start`, and `end` select dates |
 | `GET /etfs/search?q=IVV&limit=20` | search registered ETF symbols; includes latest data date when loaded |
 | `POST /portfolios` | create an anonymous saved portfolio; returns its edit key once |
 | `GET /portfolios/{id}` | portfolio name and allocated funds |
@@ -145,6 +185,11 @@ python scripts/run_pipeline.py --fund ARKK --file data/raw/ARKK_<as_of_date>.csv
 | `DELETE /portfolios/{id}` | delete a portfolio; requires `X-Portfolio-Edit-Key` |
 | `GET /portfolios/{id}/latest` | each allocated fund's newest snapshot and holdings, with coverage weight |
 | `GET /portfolios/{id}/analysis` | weighted top holdings, overlap, sectors, asset classes, coverage, and latest dates |
+| `GET /etfs/covered` | ETFs with holdings data and their sector mix (`sample: true` marks test fixtures) |
+| `POST /plan` | `{holdings: [{ticker, amount}], target?, cash_change?, max_new_funds?}` → your sector mix, distance to the target, and plans with moves |
+| `POST /chat` | `{message, history?, current?, target?, total?}` → `{reply, target, cash_change, source}`; `source` is `claude` or `rules` |
+| `GET /portfolios/{id}/preferences` | the saved dollar value and target mix |
+| `PUT /portfolios/{id}/preferences` | save the dollar value and target mix; requires `X-Portfolio-Edit-Key` |
 
 Portfolio requests use fractional weights that sum to 1 when funds are present. An empty portfolio
 can be created first and allocated later. See [the portfolio API contract](docs/portfolio-api.md)
@@ -152,7 +197,9 @@ for request examples, missing-data behavior, and the analytics handoff.
 
 The build seeds a dated snapshot of 5,787 U.S.-listed ETF symbols for search and portfolio
 selection. This catalog is separate from holdings coverage. The data team can refresh the
-catalog from Nasdaq and ingest SEC N-PORT or iShares holdings. See [ETF data sources](docs/etf-sources.md).
+catalog from Nasdaq and ingest SEC N-PORT or iShares holdings. The additive provider job can also
+store TickerInside weights and Alpaca IEX daily prices without replacing SEC snapshots. See
+[ETF data sources](docs/etf-sources.md) and [provider market data](docs/provider-market-data.md).
 Listing a symbol does not claim its holdings are available.
 
 Interactive docs are at http://localhost:8000/docs.
@@ -176,10 +223,14 @@ One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on
    project. Select Production (and Preview if you want), and leave the environment variable prefix
    empty so the variable is called `DATABASE_URL`.
 4. **Deployments → Redeploy.** The build command in `vercel.json` (`python scripts/seed_db.py`)
-   loads `data/sample` and `data/raw` into Neon. The build log shows the `inserted ...` lines.
+   removes previously seeded local fixtures, then loads real issuer files from `data/raw` into Neon.
+   Synthetic fixtures in `data/sample` are excluded from production builds. Existing synthetic fund
+   rows referenced by a saved portfolio are retained without their fixture snapshots. The build log
+   shows the `inserted ...` lines.
    Later deploys print `already ingested` and load only new files, so committing a new
    `data/raw/ARKK_<date>.csv` is enough to add a snapshot.
-5. Check `https://<api-domain>/health`. It should report `"snapshot_count": 8`.
+5. Check `https://<api-domain>/health`. With the single committed ARKK source file, it should report
+   `"snapshot_count": 1` on a clean database.
 
 **2. Frontend project**
 1. Import the same repo again as a second project, for example `fundshift`, with
@@ -196,6 +247,10 @@ One GitHub repo, two Vercel projects: the API and the frontend. Both redeploy on
    `NEXT_PUBLIC_API_URL` for the Preview environment in the frontend project.
 3. Redeploy the API.
 
+**4. Turn on the assistant (optional)**
+In the API project add `ANTHROPIC_API_KEY` (from console.anthropic.com) and redeploy. Without it,
+`/chat` uses the rule-based reader and the app labels its replies "simple reader".
+
 Make `main` the GitHub default branch so Vercel builds production from it.
 
 ## Database
@@ -208,20 +263,24 @@ duplicate/conflict/replace, rollback and the DEMO golden values all behave as on
 ## Layout
 
 ```
-backend/app/        FastAPI app, SQLAlchemy models, response schemas, routes
+backend/app/        FastAPI app, SQLAlchemy models, response schemas, routes, assistant (Claude + rules)
 backend/pipeline/   adapters (sample, ark), validate, normalize, load, reference data
-backend/analytics/  pure functions: weights, decompose, sectors, concentration, events, compare
+backend/analytics/  pure functions: rebalance (the planner), weights, decompose, sectors, concentration, events, compare
 backend/tests/      golden values from SPEC §10, pipeline and API tests
-frontend/           Next.js + Tailwind + Recharts: marketing site and the terminal app (see Frontend)
-data/sample/        synthetic fixtures (DEMO, SPLT, FLOW)
+frontend/           Next.js + Tailwind: marketing site and the one-screen app (see Frontend)
+data/sample/        local-only snapshots and fund/sector references for DEMO, SPLT, FLOWTEST; excluded from production builds
 data/raw/           real issuer files
-data/reference/     funds.csv, sectors.csv
+data/reference/     production fund reference and sector mappings
 scripts/            run_pipeline.py, fetch_holdings.py, seed_db.py (Vercel build step)
 index.py, vercel.json  Vercel entrypoint and build config for the API
 ```
 
 ## Known limitations
 
+- Exposure uses each ETF's latest published holdings, which lag by a day or more.
+- Plans ignore taxes, fees, trading costs and whole-share rounding.
+- ETFs without holdings data can't be planned with; production currently loads only the committed
+  issuer files in `data/raw`.
 - Snapshot diffs can't see trades that reversed within the period.
 - The median flow factor misreads periods where the manager changes most positions in the same direction.
 - Removed holdings use the earlier price in the counterfactual.
