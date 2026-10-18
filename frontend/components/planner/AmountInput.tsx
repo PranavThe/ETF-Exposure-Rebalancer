@@ -9,25 +9,42 @@ export default function AmountInput({
   label,
   className = "",
   placeholder = "0",
+  suffix,
+  autoFocus,
 }: {
   value: number;
   onValue: (v: number) => void;
   label: string;
   className?: string;
   placeholder?: string;
+  suffix?: string;
+  autoFocus?: boolean;
 }) {
   // What the user typed, kept only while it still describes `value` (an outside change wins).
   const [draft, setDraft] = useState<{ text: string; value: number } | null>(null);
-  const text = draft && draft.value === value ? draft.text : value ? String(Math.round(value * 100) / 100) : "";
+  const [focused, setFocused] = useState(false);
+  const formatted = value ? (focused ? String(Math.round(value * 100) / 100) : Math.round(value).toLocaleString("en-US")) : "";
+  const text = draft && draft.value === value ? draft.text : formatted;
 
   return (
-    <label className={`flex h-8 items-center gap-1 rounded-md border border-line bg-canvas px-2 focus-within:border-line-2 ${className}`}>
-      <span className="font-mono text-xs text-faint">$</span>
+    <label
+      className={`flex h-9 items-center gap-1.5 rounded-md border border-line bg-canvas px-2.5 transition-colors focus-within:border-accent-strong/70 hover:border-line-2 ${className}`}
+    >
+      <span className="font-mono text-[13px] text-faint">$</span>
       <input
         inputMode="decimal"
         aria-label={label}
         value={text}
         placeholder={placeholder}
+        autoFocus={autoFocus}
+        onFocus={(e) => {
+          setFocused(true);
+          requestAnimationFrame(() => e.target.select());
+        }}
+        onBlur={() => {
+          setFocused(false);
+          setDraft(null);
+        }}
         onChange={(e) => {
           const cleaned = e.target.value.replace(/[^0-9.,]/g, "");
           const parsed = Number(cleaned.replace(/,/g, ""));
@@ -35,8 +52,9 @@ export default function AmountInput({
           setDraft({ text: cleaned, value: v });
           onValue(v);
         }}
-        className="w-full min-w-0 bg-transparent text-right font-mono text-sm tabular-nums text-fg placeholder:text-faint focus:outline-none"
+        className="w-full min-w-0 bg-transparent text-right font-mono text-[14px] tabular-nums text-fg placeholder:text-faint focus:outline-none"
       />
+      {suffix && <span className="shrink-0 text-[11px] font-medium text-faint">{suffix}</span>}
     </label>
   );
 }

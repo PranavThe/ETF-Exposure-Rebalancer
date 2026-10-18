@@ -1,104 +1,146 @@
 "use client";
 
-import Panel from "@/components/ui/Panel";
 import { pct } from "@/lib/format";
 import { usd, type CoveredEtf, type Holding, type PlanFund } from "@/lib/planner";
 
 import AmountInput from "./AmountInput";
-import EtfPicker from "./EtfPicker";
+import { EtfSearch } from "./TopBar";
+import { AnimatedNumber, Monogram, Pane } from "./ui";
 
 /** Left column: the ETFs the user holds and the dollars in each. */
 export default function HoldingsPanel({
   holdings,
   funds,
   covered,
+  flash,
   onAmount,
   onRemove,
   onAdd,
   onExample,
+  onFocusSearch,
 }: {
   holdings: Holding[];
   funds: Map<string, PlanFund>;
   covered: CoveredEtf[];
+  flash: Set<string>;
   onAmount: (ticker: string, amount: number) => void;
   onRemove: (ticker: string) => void;
   onAdd: (etf: { ticker: string; name: string }) => void;
   onExample: () => void;
+  onFocusSearch: () => void;
 }) {
   const total = holdings.reduce((a, h) => a + h.amount, 0);
-  const missing = holdings.filter((h) => funds.get(h.ticker)?.status === "missing");
-  const missingTotal = missing.reduce((a, h) => a + h.amount, 0);
 
   return (
-    <Panel
-      tabs={[{ id: "etfs", label: "Your ETFs", count: holdings.length }]}
+    <Pane
+      tabs={[{ id: "etfs", label: "Holdings", badge: holdings.length || undefined }]}
       active="etfs"
       className="lg:h-full"
       bodyClassName="flex flex-col"
+      right={
+        holdings.length > 0 && (
+          <span className="font-mono text-[13px] text-fg">
+            <AnimatedNumber value={total} format={(v) => usd(v)} />
+          </span>
+        )
+      }
+      footer={
+        holdings.length > 0 && (
+          <button
+            type="button"
+            onClick={onFocusSearch}
+            className="hidden w-full items-center justify-center gap-2 py-3 text-[13px] font-medium text-muted transition-colors hover:bg-panel-2 hover:text-fg md:flex"
+          >
+            <span className="text-base leading-none">+</span> Add ETF
+            <kbd className="rounded border border-line px-1 font-mono text-[10px] text-faint">/</kbd>
+          </button>
+        )
+      }
     >
-      <div className="border-b border-line px-4 py-3">
-        <p className="label">Total value</p>
-        <p className="mt-1 font-mono text-2xl tabular-nums text-fg">{usd(total)}</p>
-      </div>
-
-      <div className="px-3 pt-3">
-        <EtfPicker covered={covered} exclude={new Set(holdings.map((h) => h.ticker))} onPick={onAdd} />
+      <div className="border-b border-line p-3 md:hidden">
+        <EtfSearch covered={covered} held={new Set(holdings.map((h) => h.ticker))} onPick={onAdd} focusKey={0} />
       </div>
 
       {holdings.length === 0 ? (
-        <div className="px-4 py-5 text-sm text-muted">
-          <p>Add the ETFs you own and how much is in each. Your sector mix appears in the middle.</p>
-          <button
-            type="button"
-            onClick={onExample}
-            className="mt-3 rounded-md border border-line-2 px-3 py-1.5 text-sm text-fg hover:border-accent-strong hover:text-accent"
-          >
-            Try an example portfolio
-          </button>
+        <div className="relative flex flex-1 flex-col justify-center overflow-hidden px-5 py-8">
+          <div aria-hidden className="dot-matrix absolute -right-10 -top-10 h-48 w-48 opacity-60" />
+          <p className="label relative">Step 1</p>
+          <h2 className="relative mt-2 text-xl font-medium leading-snug text-fg">Add the ETFs you own</h2>
+          <p className="relative mt-2 text-sm leading-relaxed text-muted">
+            Search any U.S.-listed ETF and type how many dollars you have in it. We look inside each fund and show
+            your real sector mix.
+          </p>
+          <div className="relative mt-5 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={onExample}
+              className="rounded-md bg-accent-strong px-4 py-2.5 text-sm font-medium text-white shadow-[0_8px_24px_-8px_rgba(122,115,240,0.7)] transition-all hover:bg-accent hover:text-canvas active:scale-[0.98]"
+            >
+              Try an example portfolio
+            </button>
+            <button
+              type="button"
+              onClick={onFocusSearch}
+              className="hidden rounded-md border border-line-2 px-4 py-2.5 text-sm text-fg transition-colors hover:border-accent-strong/60 md:block"
+            >
+              Search ETFs <kbd className="ml-1 rounded border border-line px-1 font-mono text-[10px] text-faint">⌘K</kbd>
+            </button>
+          </div>
         </div>
       ) : (
-        <ul className="mt-2 divide-y divide-line">
-          {holdings.map((h) => {
+        <ul className="divide-y divide-line/80">
+          {holdings.map((h, i) => {
             const fund = funds.get(h.ticker);
             const noData = fund?.status === "missing";
+            const share = total > 0 ? h.amount / total : 0;
             return (
-              <li key={h.ticker} className="px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-semibold">{h.ticker}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-muted" title={h.name}>{h.name}</span>
+              <li
+                key={h.ticker}
+                className={`group relative animate-fade-up px-3 py-3 transition-colors hover:bg-panel-2/60 ${flash.has(h.ticker) ? "flash" : ""}`}
+                style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+              >
+                <div className="flex items-center gap-3">
+                  <Monogram ticker={h.ticker} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[14px] font-semibold text-fg">{h.ticker}</span>
+                      {noData ? (
+                        <span className="rounded bg-activity/15 px-1.5 py-px font-mono text-[10px] text-activity">no data yet</span>
+                      ) : (
+                        <span className="font-mono text-[11px] text-faint">{pct(share)}</span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-muted" title={h.name}>
+                      {h.name}
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => onRemove(h.ticker)}
                     aria-label={`Remove ${h.ticker}`}
-                    className="rounded px-1 text-faint hover:text-down"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-faint opacity-60 transition-all hover:bg-down/10 hover:text-down group-hover:opacity-100"
                   >
-                    ×
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
                   </button>
                 </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <AmountInput value={h.amount} onValue={(v) => onAmount(h.ticker, v)} label={`Dollars in ${h.ticker}`} className="flex-1" />
-                  <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
-                    {total > 0 ? pct(h.amount / total, 0) : "–"}
-                  </span>
+                <div className="mt-2.5 flex items-center gap-3 pl-[40px]">
+                  <AmountInput value={h.amount} onValue={(v) => onAmount(h.ticker, v)} label={`Dollars in ${h.ticker}`} className="w-32" />
+                  <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-panel-3">
+                    <div className="bar-anim h-full rounded-full bg-accent/80" style={{ width: `${share * 100}%` }} />
+                  </div>
                 </div>
                 {noData && (
-                  <p className="mt-1 text-[11px] text-faint">No holdings data yet, so it isn’t counted in your mix.</p>
-                )}
-                {fund?.as_of_date && (
-                  <p className="mt-1 font-mono text-[10px] text-faint">holdings as of {fund.as_of_date}</p>
+                  <p className="mt-2 pl-[40px] text-[11px] leading-relaxed text-faint">
+                    Its holdings aren’t loaded yet, so it stays out of your mix and the moves.
+                  </p>
                 )}
               </li>
             );
           })}
         </ul>
       )}
-
-      {missing.length > 0 && (
-        <p className="mt-auto border-t border-line px-4 py-2.5 text-xs text-muted">
-          {usd(missingTotal)} in {missing.map((m) => m.ticker).join(", ")} is kept out of the mix and the moves until
-          its holdings are loaded.
-        </p>
-      )}
-    </Panel>
+    </Pane>
   );
 }

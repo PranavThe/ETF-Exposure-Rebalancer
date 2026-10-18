@@ -22,14 +22,24 @@ import {
 } from "@/lib/planner";
 
 import ChatPanel from "./ChatPanel";
+import ExposurePanel from "./ExposurePanel";
 import HoldingsPanel from "./HoldingsPanel";
-import MixPanel from "./MixPanel";
-import PlansPanel, { type MoneyMode } from "./PlansPanel";
+import MovesPanel from "./MovesPanel";
+import PlanPanel, { type MoneyMode } from "./PlanPanel";
+import StatusBar from "./StatusBar";
+import { StatStrip, TickerTape } from "./Strips";
+import TopBar from "./TopBar";
+import { Toasts, type Toast } from "./ui";
+
+function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
 
 const EXAMPLE = [
-  { ticker: "IVV", amount: 6000 },
-  { ticker: "IYW", amount: 3000 },
-  { ticker: "ARKK", amount: 1000 },
+  { ticker: "IVV", name: "iShares Core S&P 500 ETF", amount: 6000 },
+  { ticker: "IYW", name: "iShares U.S. Technology ETF", amount: 3000 },
+  { ticker: "ARKK", name: "ARK Innovation ETF", amount: 1000 },
 ];
 
 type Saved = { id: string; key: string | null };
@@ -61,7 +71,10 @@ export default function PlannerApp() {
   const [ready, setReady] = useState(false);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [copied, setCopied] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [flash, setFlash] = useState<Set<string>>(new Set());
+  const [focusKey, setFocusKey] = useState(0);
+  const [connected, setConnected] = useState<boolean | null>(null);
   const dirty = useRef(false);
   const savedId = useRef<string | null>(null);
 
@@ -180,17 +193,32 @@ export default function PlannerApp() {
   const distance = target && hasHoldings ? mixDistance(current, target) : null;
   const saveShown: SaveState = !saved && holdings.length === 0 ? "idle" : saveState;
 
+  function toast(text: string, tone: Toast["tone"] = "ok") {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t.slice(-2), { id, text, tone }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2600);
+  }
+
+  function highlight(tickers: string[]) {
+    setFlash(new Set(tickers));
+    setTimeout(() => setFlash(new Set()), 1000);
+  }
+
   function addEtf(etf: { ticker: string; name: string }) {
+    if (holdings.some((h) => h.ticker === etf.ticker)) {
+      toast(`${etf.ticker} is already in your holdings`, "info");
+      return;
+    }
     markDirty();
-    setHoldings((hs) => (hs.some((h) => h.ticker === etf.ticker) ? hs : [...hs, { ...etf, amount: 1000 }]));
+    setHoldings((hs) => [...hs, { ...etf, amount: 1000 }]);
+    highlight([etf.ticker]);
+    toast(`Added ${etf.ticker} with $1,000. Type the amount you hold.`);
   }
 
   function loadExample() {
-    const known = new Set(covered.map((c) => c.ticker));
-    const pick = EXAMPLE.filter((e) => known.has(e.ticker));
-    const chosen = pick.length ? pick : covered.filter((c) => !c.sample).slice(0, 3).map((c, i) => ({ ticker: c.ticker, amount: [6000, 3000, 1000][i] }));
     markDirty();
-    setHoldings(chosen.map((e) => ({ ...e, name: covered.find((c) => c.ticker === e.ticker)?.name ?? e.ticker })));
+    setHoldings(EXAMPLE.map((e) => ({ ...e })));
+    toast("Example portfolio loaded");
   }
 
   function moveSlider(sector: string, value: number) {
@@ -218,6 +246,8 @@ export default function PlannerApp() {
     setHoldings(next);
     setMoney("same");
     setActivePlan(0);
+    highlight(p.moves.map((m) => m.ticker));
+    toast(`Applied ${p.moves.length} move${p.moves.length === 1 ? "" : "s"}. Your amounts are updated.`);
   }
 
   async function sendChat(message: string) {
@@ -241,10 +271,12 @@ export default function PlannerApp() {
         setMoney(reply.cash_change > 0 ? "add" : "out");
         setAmount(Math.abs(reply.cash_change));
       }
+      setConnected(reply.source === "claude");
       setTurns((t) => [
         ...t,
         { role: "assistant", content: reply.reply, note: reply.source === "rules" ? "simple reader (AI not connected)" : undefined },
       ]);
+      if (reply.target) toast("Target updated", "info");
     } catch (err) {
       setTurns((t) => [...t, { role: "assistant", content: `Sorry, that didn’t go through. ${(err as Error).message}` }]);
     } finally {
@@ -255,10 +287,9 @@ export default function PlannerApp() {
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      toast("Link copied. Anyone with it can view this portfolio.");
     } catch {
-      setCopied(false);
+      toast("Couldn’t copy. Copy the address bar instead.", "error");
     }
   }
 
@@ -274,82 +305,99 @@ export default function PlannerApp() {
     setTouched(new Set());
     setTurns([]);
     setMoney("same");
+    toast("Cleared. Start a new portfolio.", "info");
   }
 
-  return (
-    <div className="flex min-h-full flex-col gap-2 p-2 lg:h-full">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-muted">
-        <span className="flex items-center gap-1.5">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              saveShown === "saved" ? "bg-up" : saveShown === "saving" || saveShown === "pending" ? "bg-activity" : saveShown === "error" ? "bg-down" : "bg-faint"
-            }`}
-          />
-          {saveShown === "saved"
-            ? saved?.key
-              ? "Saved. Only this browser can edit it."
-              : "Viewing a shared portfolio. Changes save as your own copy."
-            : saveShown === "saving" || saveShown === "pending"
-              ? "Saving…"
-              : saveShown === "error"
-                ? "Couldn’t save. Your changes are still here."
-                : "Add an ETF and your portfolio saves automatically."}
-        </span>
-        <span className="ml-auto flex items-center gap-2">
-          {saved && (
-            <button type="button" onClick={copyLink} className="rounded border border-line px-2 py-0.5 hover:text-fg">
-              {copied ? "Link copied" : "Copy link"}
-            </button>
-          )}
-          {(holdings.length > 0 || saved) && (
-            <button type="button" onClick={startOver} className="rounded border border-line px-2 py-0.5 hover:text-fg">
-              Start over
-            </button>
-          )}
-        </span>
-      </div>
+  const total = holdings.reduce((a, h) => a + h.amount, 0);
+  const missing = (result?.funds ?? []).filter((f) => f.status === "missing");
+  const largest = (result?.current ?? [])
+    .filter((s) => s.sector !== "Unclassified")
+    .reduce<{ sector: string; weight: number } | null>((best, s) => (!best || s.weight > best.weight ? s : best), null);
+  const match = distance === null ? null : 1 - distance;
+  const best = plans.length ? plans.reduce((a, b) => (b.distance < a.distance ? b : a)) : null;
+  const dates = (result?.funds ?? []).map((f) => f.as_of_date).filter((d): d is string => Boolean(d)).sort();
+  const asOf = dates.length ? (dates[0] === dates[dates.length - 1] ? shortDate(dates[0]) : `${shortDate(dates[0])} – ${shortDate(dates[dates.length - 1])}`) : null;
+  const held = useMemo(() => new Set(holdings.map((h) => h.ticker)), [holdings]);
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <HoldingsPanel
-          holdings={holdings}
-          funds={funds}
-          covered={covered}
-          onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
-          onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
-          onAdd={addEtf}
-          onExample={loadExample}
-        />
-        <MixPanel
-          current={current}
-          target={target}
-          preview={preview}
-          distance={distance}
-          funds={result?.funds ?? []}
-          hasHoldings={hasHoldings}
-          onSector={moveSlider}
-          onReset={resetTarget}
-        />
-        <div className="flex min-h-0 flex-col gap-2">
-          <PlansPanel
-            plans={plans}
-            active={activePlan}
-            onActive={setActivePlan}
-            hasTarget={target !== null}
-            hasHoldings={hasHoldings}
-            beforeDistance={distance}
-            loading={planning}
-            error={planError}
-            money={money}
-            amount={amount}
-            maxNew={maxNew}
-            onMoney={setMoney}
-            onAmount={setAmount}
-            onMaxNew={setMaxNew}
-            onApply={applyPlan}
-          />
-          <ChatPanel turns={turns} busy={chatBusy} onSend={sendChat} />
+  return (
+    <div className="app-arcs flex h-dvh flex-col bg-canvas">
+      <TopBar
+        covered={covered}
+        held={held}
+        onPick={addEtf}
+        focusKey={focusKey}
+        save={saveShown}
+        owner={Boolean(saved?.key)}
+        canShare={Boolean(saved)}
+        onShare={copyLink}
+        onReset={holdings.length > 0 || saved ? startOver : null}
+      />
+      <TickerTape etfs={covered} onPick={addEtf} />
+      <main className="min-h-0 flex-1 overflow-auto lg:overflow-hidden">
+        <div className="flex flex-col gap-2 p-2 lg:h-full">
+          <div className="animate-fade-up">
+            <StatStrip
+              total={total}
+              covered={result?.covered_total ?? 0}
+              etfCount={holdings.length}
+              missingCount={missing.length}
+              largest={largest}
+              match={match}
+              bestMatch={best ? 1 - best.distance : null}
+              bestMoved={best ? best.moves.filter((m) => m.action === "reduce" || m.action === "remove").reduce((a, m) => a + m.amount, 0) : null}
+              asOf={asOf}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 lg:min-h-0 lg:flex-1 lg:grid-cols-[272px_minmax(0,1fr)_340px] 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
+            <div className="animate-fade-up lg:min-h-0" style={{ animationDelay: "60ms" }}>
+              <HoldingsPanel
+                holdings={holdings}
+                funds={funds}
+                covered={covered}
+                flash={flash}
+                onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
+                onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
+                onAdd={addEtf}
+                onExample={loadExample}
+                onFocusSearch={() => setFocusKey((k) => k + 1)}
+              />
+            </div>
+            <div className="flex animate-fade-up flex-col gap-2 lg:min-h-0" style={{ animationDelay: "120ms" }}>
+              <ExposurePanel
+                current={current}
+                target={target}
+                preview={preview}
+                match={match}
+                funds={result?.funds ?? []}
+                hasHoldings={hasHoldings}
+                onSector={moveSlider}
+                onReset={resetTarget}
+              />
+              <MovesPanel plans={plans} active={activePlan} onActive={setActivePlan} hasTarget={target !== null} loading={planning} error={planError} />
+            </div>
+            <div className="flex animate-fade-up flex-col gap-2 lg:min-h-0" style={{ animationDelay: "180ms" }}>
+              <PlanPanel
+                plans={plans}
+                active={activePlan}
+                onActive={setActivePlan}
+                match={match}
+                total={result?.covered_total ?? total}
+                money={money}
+                amount={amount}
+                maxNew={maxNew}
+                onMoney={setMoney}
+                onAmount={setAmount}
+                onMaxNew={setMaxNew}
+                onApply={applyPlan}
+                hasTarget={target !== null}
+              />
+              <ChatPanel turns={turns} busy={chatBusy} onSend={sendChat} connected={connected} />
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
+      <StatusBar etfsWithData={covered.filter((c) => !c.sample).length} />
+      <Toasts toasts={toasts} />
     </div>
   );
 }
