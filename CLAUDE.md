@@ -47,7 +47,10 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
   snapshot; `/etfs/covered` lists the allowlisted funds with holdings (and Synthetic fixtures
   only when a test database has loaded them).
 - Routes: `POST /plan`, `GET /etfs/covered`, `GET/PUT /portfolios/{id}/preferences` (`routes/plans.py`);
-  `POST /chat` (`routes/chat.py`, `app/assistant.py`). Saved portfolios reuse the weights-based
+  `POST /chat` (`routes/chat.py`, `app/assistant.py`); `POST /exposure/companies` (`routes/companies.py`);
+  `POST /explain/plan`, `POST /explain/etf` (`routes/explain.py`, `app/explain.py`: our code builds the
+  facts, Gemini only words them, a template when it can't). Fees: `data/reference/expense_ratios.csv`
+  (`scripts/fetch_expense_ratios.py`, fractions), read through the `fund_fees` dependency. Saved portfolios reuse the weights-based
   portfolio API; the dollar value and target live in `portfolio_preferences`.
 - Scythe (the assistant) only turns the user's words into a target mix; it never chooses one and never
   adds or takes out money (plans always use the money already in the ETFs). With `GEMINI_API_KEY` it asks

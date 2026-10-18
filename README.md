@@ -67,6 +67,8 @@ needed to use the product.
 | **Apply your target** | Uses the sector mix you choose with sliders or Scythe. The assistant translates your request into numbers. |
 | **Build plans** | Finds allocations using your existing portfolio total, either within your current ETFs or with a limited number of new funds. |
 | **Show the difference** | Reports whole-dollar moves and the distance between the resulting mix and your target. |
+| **Show the costs and overlap** | Shows each fund's yearly fee (from its SEC filing) and the plan's fees before and after, and adds up each company across your ETFs to show how much they overlap. |
+| **Explain in plain words** | Gemini explains a plan ("Why these moves?") or a fund ("What's inside?") from facts the app computes; a template stands in when Gemini is unavailable. |
 
 All weights in the API and database are **fractions**: `0.07` means 7%. The interface shows levels
 as percentages and differences as percentage points. Distance is half the sum of absolute sector

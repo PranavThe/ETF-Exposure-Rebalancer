@@ -298,6 +298,13 @@ export default function MethodologyPage() {
                 handles plain requests such as &ldquo;less tech&rdquo;, &ldquo;no energy&rdquo; or &ldquo;30% health
                 care&rdquo;.
               </p>
+              <p>
+                Gemini also writes two explanations on request. &ldquo;Why these moves?&rdquo; describes a plan and
+                &ldquo;What&apos;s inside?&rdquo; describes a fund. Glean computes the facts first (each move&apos;s
+                sectors, the gaps to your target, fees, the biggest holdings) and Gemini only puts them into plain words;
+                moves it names that aren&apos;t in the plan are dropped. When Gemini is busy, the same facts fill a fixed
+                template, and each explanation says which one you are reading.
+              </p>
             </DocSection>
 
             <DocSection id="sources" index={n("sources")} title={t("sources")}>
@@ -365,8 +372,9 @@ export default function MethodologyPage() {
             <DocSection id="limitations" index={n("limitations")} title={t("limitations")}>
               <Bullets>
                 <li>
-                  Taxes, fees, transaction costs and bid-ask spreads are not considered. Reducing an ETF can have tax
-                  consequences.
+                  Taxes, transaction costs and bid-ask spreads are not considered. Reducing an ETF can have tax
+                  consequences. Yearly fund fees (net expense ratios) are shown, from each fund&apos;s SEC filing via
+                  TickerInside, with the filing date; they don&apos;t change which plan is found.
                 </li>
                 <li>
                   Holdings can lag by a day or more (N-PORT by months), and funds change their holdings over time, so
@@ -379,8 +387,9 @@ export default function MethodologyPage() {
                   may be Unclassified. IEX closes may differ from consolidated market prices.
                 </li>
                 <li>
-                  The mix is by sector only. It says nothing about company size, country, or whether two ETFs hold the
-                  same companies within a sector.
+                  The mix and the plans are by sector only. The Companies view adds up each company across your ETFs
+                  and shows how much two funds overlap (the share of each held in the same companies), but plans
+                  don&apos;t aim at company-level targets, company size or country.
                 </li>
                 <li>
                   Plans are in dollars, not shares, and don&apos;t check minimums or whole-share rules. They only use
