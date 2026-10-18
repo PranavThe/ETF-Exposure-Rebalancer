@@ -33,11 +33,15 @@ a run occurs on weekends or holidays. No provider calls are made from user-facin
 
 The command fetches the selected funds' current TickerInside files, stores each distinct source
 snapshot in `provider_holdings_snapshots` and its ticker/weight rows in `provider_holdings`, then
-fetches daily bars for those funds plus their unique holding tickers in batches of up to 100 using
+fetches daily bars for those funds plus their unique U.S. stock holding symbols in batches of up to 100 using
 Alpaca's `feed=iex` with `adjustment=all`. Prices are stored by symbol, date, provider, feed, and
 adjustment in `security_prices`.
 Repeated identical holdings snapshots are no-ops; a corrected file for the same source date is
 retained as a separately hashed snapshot. Daily price bars are updated in place if fetched again.
+TickerInside identifiers are stored in a text column because some funds report bonds and other
+non-equity assets by description rather than by stock ticker. The sync skips those descriptions
+when building the Alpaca stock-price request. On existing PostgreSQL databases, the sync widens
+the legacy `provider_holdings.ticker` column from `VARCHAR(32)` to `TEXT` before saving holdings.
 
 ## Read endpoints
 

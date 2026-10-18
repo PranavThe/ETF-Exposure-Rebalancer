@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from datetime import date, datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -18,10 +19,18 @@ API_ROOT = "https://data.alpaca.markets/v2/stocks/bars"
 MAX_SYMBOLS_PER_REQUEST = 100
 FEED = "iex"
 ADJUSTMENT = "all"
+_STOCK_SYMBOL = re.compile(r"^[A-Z0-9][A-Z0-9.-]{0,5}$")
 
 
 class AlpacaError(RuntimeError):
     pass
+
+
+def priceable_stock_symbols(symbols: set[str]) -> set[str]:
+    """Keep short U.S. equity symbols; ignore provider labels and fixed-income IDs."""
+    normalized = {symbol.strip().upper() for symbol in symbols if symbol.strip()}
+    return {symbol for symbol in normalized
+            if _STOCK_SYMBOL.fullmatch(symbol) and any(char.isalpha() for char in symbol)}
 
 
 def _get_bars(symbols: list[str], *, start: date, end: date, api_key: str,
@@ -85,7 +94,7 @@ def fetch_daily_bars(symbols: set[str], *, start: date, end: date) -> list[dict]
     api_secret = os.environ.get("ALPACA_API_SECRET_KEY")
     if not api_key or not api_secret:
         raise AlpacaError("Set ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY in the backend environment")
-    normalized = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+    normalized = sorted(priceable_stock_symbols(symbols))
     bars = []
     for offset in range(0, len(normalized), MAX_SYMBOLS_PER_REQUEST):
         bars.extend(_get_bars(normalized[offset:offset + MAX_SYMBOLS_PER_REQUEST], start=start,
