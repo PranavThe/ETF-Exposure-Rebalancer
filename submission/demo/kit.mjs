@@ -23,7 +23,7 @@ const OVERLAY = () => {
   html.demo-band .h-dvh{height:calc(100dvh - 104px)!important}
   #demo-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(60% 60% at 50% 40%,rgba(122,115,240,.28),rgba(11,11,13,.97) 70%),#0b0b0d;opacity:0;transition:opacity 500ms}
   #demo-card.on{opacity:1}
-  #demo-card .b{font-size:64px;font-weight:700;letter-spacing:-.02em;color:#f2f2f6}
+  #demo-card .b{width:360px;height:118.3px;margin-bottom:10px;background:url(/brand/glean-logo.png) -47.2px -6.1px/454.1px auto no-repeat}
   #demo-card .t{margin-top:14px;font-size:30px;color:#d8d6ff;font-weight:500}
   #demo-card .s{margin-top:22px;font-size:18px;color:#a3a3b2;max-width:860px;line-height:1.5}`;
   const root = document.createElement("div");
@@ -141,16 +141,19 @@ export function makeKit(page, ctx) {
   async function captionFits() {
     return page.evaluate(() => [...document.querySelectorAll("#demo-cap .t, #demo-cap .s")].every((e) => e.scrollWidth <= e.clientWidth + 1));
   }
-  async function card(brand, title, sub, ms) {
+  /** A full-screen title card: the site's own logo (served at /brand/glean-logo.png), a title and a line. */
+  async function card(title, sub, ms) {
     await ensure();
-    await page.evaluate(({ brand, title, sub }) => {
+    await page.evaluate(async ({ title, sub }) => {
       const c = document.getElementById("demo-card");
-      c.querySelector(".b").textContent = brand;
+      const logo = new Image();
+      logo.src = "/brand/glean-logo.png";
+      await logo.decode();
       c.querySelector(".t").textContent = title;
       c.querySelector(".s").textContent = sub;
       c.classList.add("on");
       document.getElementById("demo-cursor").style.opacity = "0";
-    }, { brand, title, sub });
+    }, { title, sub });
     await hold(ms);
   }
   async function uncard() {

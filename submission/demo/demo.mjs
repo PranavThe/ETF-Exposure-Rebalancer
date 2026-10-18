@@ -32,7 +32,7 @@ await page.waitForTimeout(800);
 const capture = RECORD ? await startCapture(ctx, page) : null;
 
 // 0 · Title
-await k.card("Glean", "See what your ETFs really hold", "A one-screen tool for first-time investors: your real sector mix, the companies inside your funds, and the exact moves to the mix you want.", 4800);
+await k.card("See what your ETFs really hold", "A one-screen tool for first-time investors: your real sector mix, the companies inside your funds, and the exact moves to the mix you want.", 4800);
 await k.uncard();
 
 // 1 · The problem (landing page)
@@ -210,7 +210,7 @@ await k.unring();
 await k.uncaption();
 
 // 11 · End card
-await k.card("Glean", "See what you really own. Choose the mix you want.", "glean-etf.vercel.app  ·  Built with the Gemini API  ·  Based on dated ETF holdings. Not investment advice.", 5200);
+await k.card("See what you really own. Choose the mix you want.", "glean-etf.vercel.app  ·  Built with the Gemini API  ·  Based on dated ETF holdings. Not investment advice.", 5200);
 
 must(fits.length === 0, `every caption fits its band (${fits.join(" | ")})`);
 must(errors.length === 0, `no page errors (${errors.join(" | ").slice(0, 200)})`);
