@@ -69,6 +69,16 @@ differences.
 - **An ETF's sector mix** comes from its latest stored snapshot: market value by sector over total
   positive market value. Non-equity rows count as "Cash & other". Issuer labels are mapped to 11
   standard sectors (`backend/analytics/rebalance.py`, `SECTOR_ALIASES`).
+- **Holdings without a sector** (SEC N-PORT rows carry only a CUSIP and a name) get one from the
+  company name: `normalize_company_name` turns "Alphabet, Inc., Class A", "ALPHABET INC-A" and
+  "ALPHABET CLASS A" into `alphabet`, which is looked up in `data/reference/name_sectors.csv`
+  (built by `scripts/build_name_sectors.py` from iShares holdings files, which do carry sectors).
+  A holding still unclassified then takes the sector its CUSIP has in one of the suggestable ETFs.
+  Whatever is left shows as "Unclassified".
+- **Suggested ETFs** come only from a short allowlist of plain, liquid index ETFs
+  (`SUGGESTABLE_ETFS` in `rebalance.py`) whose mix is at least 80% classified. You can hold any ETF;
+  it counts in your mix and can be increased or reduced, but leveraged, inverse, single-stock or
+  obscure funds are never proposed. `GET /etfs/covered` lists the allowlisted ETFs with data.
 - **Your exposure** is the dollar-weighted blend of your ETFs' mixes. ETFs without holdings data are
   listed as `missing`, kept as they are, and left out of the mix and the moves.
 - **Distance** between two mixes is half the sum of absolute differences (0 = identical, 1 = no

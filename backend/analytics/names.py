@@ -39,7 +39,7 @@ ABBREVIATIONS = {
     "ppty": "property", "prop": "property", "elec": "electric", "pharm": "pharmaceuticals",
     "tech": "technology", "techs": "technologies", "comm": "communications",
     "commun": "communities", "util": "utilities", "res": "resources", "invs": "investors",
-    "tr": "trust", "tst": "trust",
+    "tr": "trust", "tst": "trust", "cie": "compagnie",
 }
 
 # Prefix matches need at least this much text, so "general" never stands for "general motors".
@@ -48,7 +48,9 @@ MIN_PREFIX_CHARS = 8
 
 _APOSTROPHES = re.compile(r"['’`]")
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
-_TRUNCATED_ENDINGS = SUFFIXES | {"holdings", "group"}
+_PHRASE_ENDS = frozenset(p[-1] for p in SUFFIX_PHRASES)
+# Cut-off forms of the endings above ("in" for "inc", "rei" for "reit", "ho" for "holdings").
+_CUT_ENDINGS = frozenset(w[:n] for w in SUFFIXES | {"holdings", "group"} for n in range(2, len(w)))
 
 
 def _join_initials(tokens: list[str]) -> list[str]:
@@ -59,12 +61,12 @@ def _join_initials(tokens: list[str]) -> list[str]:
         j = i
         while j < len(tokens) and len(tokens[j]) == 1 and tokens[j].isalpha():
             j += 1
+        j = max(j, i + 1)  # always take at least the token at i
         if j - i >= 2 and j < len(tokens):
             out.append("".join(tokens[i:j]))
-            i = j
         else:
-            out.extend(tokens[i:max(j, i + 1)])
-            i = max(j, i + 1)
+            out.extend(tokens[i:j])
+        i = j
     return out
 
 
@@ -81,8 +83,8 @@ def normalize_company_name(name: str | None) -> str:
     if len(tokens) > 1 and tokens[0] == "the":
         tokens = tokens[1:]
     while len(tokens) > 1:
-        phrase = next((p for p in SUFFIX_PHRASES
-                       if len(tokens) > len(p) and tuple(tokens[-len(p):]) == p), None)
+        phrase = tokens[-1] in _PHRASE_ENDS and next(
+            (p for p in SUFFIX_PHRASES if len(tokens) > len(p) and tuple(tokens[-len(p):]) == p), None)
         if phrase:
             tokens = tokens[:-len(phrase)]
         elif tokens[-1] in SUFFIXES:
@@ -168,9 +170,7 @@ class NameSectors:
         if hit:
             return hit
         tokens = key.split()
-        last = tokens[-1]
-        if (len(tokens) > 1 and len(last) >= 2
-                and any(w.startswith(last) and w != last for w in _TRUNCATED_ENDINGS)):
+        if len(tokens) > 1 and tokens[-1] in _CUT_ENDINGS:
             hit = self._whole(normalize_company_name(" ".join(tokens[:-1])))
             if hit:
                 return hit

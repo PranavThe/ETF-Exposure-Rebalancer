@@ -12,6 +12,7 @@ from backend.analytics.rebalance import (
     fund_sector_weights,
     normalize_target,
     solve_mix,
+    suggestable,
 )
 
 from .golden import close
@@ -142,3 +143,14 @@ def test_held_fund_without_data_is_kept_out_of_planning():
     for plan in plans:
         assert "NODATA" not in plan.allocation
         assert math.isclose(plan.total_before, 1000)
+
+
+def test_suggestable_needs_the_allowlist_and_classified_holdings():
+    weights = {
+        "A": TECH,
+        "B": {"Technology": 0.7, UNCLASSIFIED: 0.3},  # under 80% classified
+        "C": {CASH_OTHER: 1.0},  # a bond fund: Cash & other counts as classified
+        "D": HEALTH,  # not on the allowlist
+        "E": {},  # no data
+    }
+    assert suggestable(weights, {"A", "B", "C", "E"}) == {"A", "C"}

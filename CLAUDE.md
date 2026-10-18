@@ -25,7 +25,17 @@ Never edit a golden value (SPEC §10) to make a test pass; if one looks wrong, s
 
 ## Planner
 - Pure planner: `backend/analytics/rebalance.py` (sector mixes, exposure, distance, the QP solver,
-  plans). Its constants (`MIN_POSITION`, `MIN_GAIN`, `SHORTLIST_SIZE`) live there.
+  plans). Its constants (`MIN_POSITION`, `MIN_GAIN`, `SHORTLIST_SIZE`) live there, and so do
+  `SUGGESTABLE_ETFS` (the only ETFs a plan may add; users can hold any ETF) and `MIN_CLASSIFIED`
+  (a fund under 80% classified is never suggested). Routes read the list through the
+  `suggestable_etfs` dependency; tests override it.
+- Planner sectors per holding: security_sectors table, then the issuer's label (`resolve_sector`),
+  then the company name (`backend/analytics/names.py` over `data/reference/name_sectors.csv`), then
+  the sector the same security id has in an allowlisted fund. Rebuild the CSV with
+  `scripts/build_name_sectors.py` from the gitignored `data/vendor/ishares/*.csv`. The name fallback
+  is planner-only: `/funds/...` and the change analysis still use `resolve_sector` alone.
+- `load_universe` (`routes/plans.py`) reads only the held funds and the allowlist, caching mixes per
+  snapshot; `/etfs/covered` lists the allowlisted funds with holdings (plus local Synthetic samples).
 - Routes: `POST /plan`, `GET /etfs/covered`, `GET/PUT /portfolios/{id}/preferences` (`routes/plans.py`);
   `POST /chat` (`routes/chat.py`, `app/assistant.py`). Saved portfolios reuse the weights-based
   portfolio API; the dollar value and target live in `portfolio_preferences`.

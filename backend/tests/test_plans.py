@@ -1,32 +1,56 @@
 """Planner API: sector mix of a portfolio, plans toward a target, saved preferences."""
 
+import hashlib
 import math
 from datetime import date
 
+import pytest
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_engine
+from backend.app.main import app
 from backend.app.models import Fund, Holding, Snapshot
+from backend.app.routes.plans import suggestable_etfs
 
 
 def close(a: float, b: float) -> bool:
     return math.isclose(a, b, abs_tol=1e-9)
 
 
-def add_fund(ticker: str, sectors: dict[str, float], issuer: str = "Test Issuer") -> None:
-    """A fund with one snapshot whose equity holdings split by `sectors` (market values)."""
+@pytest.fixture(autouse=True)
+def allow():
+    """Plans may suggest only allowlisted ETFs. These tests use made-up funds, so they set the list."""
+    def set_allowlist(*tickers: str) -> None:
+        app.dependency_overrides[suggestable_etfs] = lambda: frozenset(tickers)
+
+    set_allowlist("TECHX", "HLTHX")
+    yield set_allowlist
+    app.dependency_overrides.pop(suggestable_etfs, None)
+
+
+def add_holdings(ticker: str, rows: list[tuple[str, str, str | None, float]],
+                 issuer: str = "Test Issuer") -> None:
+    """A fund with one snapshot of equity rows (security_id, name, source_sector, market_value)."""
+    # The planner caches mixes by (snapshot id, content hash), so the hash must follow the content.
+    digest = hashlib.sha256(repr((ticker, rows)).encode()).hexdigest()
     with Session(get_engine()) as session, session.begin():
         fund = Fund(ticker=ticker, name=f"{ticker} Fund", issuer=issuer)
         session.add(fund)
         session.flush()
-        snapshot = Snapshot(fund_id=fund.id, as_of_date=date(2026, 10, 16), content_hash=ticker * 4,
-                            row_count=len(sectors))
+        snapshot = Snapshot(fund_id=fund.id, as_of_date=date(2026, 10, 16), content_hash=digest,
+                            row_count=len(rows))
         session.add(snapshot)
         session.flush()
-        for i, (sector, value) in enumerate(sectors.items()):
-            session.add(Holding(snapshot_id=snapshot.id, security_id=f"{ticker}{i}", name=f"{ticker} {i}",
+        for security_id, name, sector, value in rows:
+            session.add(Holding(snapshot_id=snapshot.id, security_id=security_id, name=name,
                                 asset_class="equity", source_sector=sector, shares=1, price=value,
                                 market_value=value))
+
+
+def add_fund(ticker: str, sectors: dict[str, float], issuer: str = "Test Issuer") -> None:
+    """A fund whose equity holdings split by `sectors` (market values)."""
+    add_holdings(ticker, [(f"{ticker}{i}", f"{ticker} {i}", sector, value)
+                          for i, (sector, value) in enumerate(sectors.items())], issuer)
 
 
 def mix(items: list[dict]) -> dict[str, float]:
@@ -127,3 +151,66 @@ def test_preferences_need_the_edit_key(client):
     assert saved.status_code == 200 and saved.json() == prefs
     assert client.get(path).json() == prefs
     assert client.get("/portfolios/missing/preferences").status_code == 404
+
+
+def test_covered_lists_only_allowlisted_funds(client, allow):
+    add_fund("TECHX", {"Information Technology": 100})
+    add_fund("LEVX", {"Information Technology": 100})  # has holdings but is not on the allowlist
+    allow("TECHX", "NODATA")
+    tickers = {e["ticker"] for e in client.get("/etfs/covered").json()}
+    assert tickers == {"TECHX", "DEMO", "SPLT", "FLOWTEST"}  # local sample funds stay listed
+
+
+def test_holdings_without_a_sector_are_classified_by_company_name(client):
+    # N-PORT rows: a CUSIP and a company name, no sector (data/reference/name_sectors.csv).
+    add_holdings("NPORTX", [
+        ("037833100", "Apple, Inc.", None, 600),
+        ("46625H100", "JPMorgan Chase & Co.", None, 300),
+        ("000000000", "Not A Listed Company Of Any Kind", None, 100),
+        ("ISSUERX1", "Apple, Inc.", "Health Care", 100),  # the issuer's own label still comes first
+    ])
+    body = client.post("/plan", json={"holdings": [{"ticker": "NPORTX", "amount": 1100}]}).json()
+    assert mix(body["funds"][0]["sectors"]) == pytest.approx(
+        {"Technology": 6 / 11, "Financials": 3 / 11, "Health Care": 1 / 11, "Unclassified": 1 / 11},
+        abs=1e-9)
+
+
+def test_a_security_takes_its_sector_from_an_allowlisted_fund(client, allow):
+    # Vanguard filings shorten names ("ADV MICRO DEVICE"); the same CUSIP in an allowlisted fund
+    # with a full name gives the sector.
+    add_holdings("BROADX", [("007903107", "Advanced Micro Devices, Inc.", None, 100)])
+    add_holdings("VANGX", [("007903107", "ZZ UNMATCHED SHORT NAME", None, 50),
+                           ("999999999", "ZZ ANOTHER UNMATCHED NAME", None, 50)])
+    allow("BROADX")
+    body = client.post("/plan", json={"holdings": [{"ticker": "VANGX", "amount": 1000}]}).json()
+    assert mix(body["funds"][0]["sectors"]) == {"Technology": 0.5, "Unclassified": 0.5}
+
+
+def test_only_allowlisted_well_classified_funds_are_suggested(client, allow):
+    add_fund("TECHX", {"Information Technology": 100})
+    add_fund("HLTHX", {"Health Care": 100})  # matches the target exactly, but not allowlisted
+    add_fund("HLTH2X", {"Health Care": 60, "Unknown": 40})  # allowlisted, but 40% unclassified
+    add_fund("BLENDX", {"Health Care": 80, "Information Technology": 20})  # allowlisted
+    allow("TECHX", "HLTH2X", "BLENDX")
+    body = client.post("/plan", json={
+        "holdings": [{"ticker": "TECHX", "amount": 10000}],
+        "target": {"Technology": 50, "Health Care": 50},
+    }).json()
+    suggested = {t for p in body["plans"] for t in p["new_funds"]}
+    assert suggested == {"BLENDX"}
+    assert all(m["ticker"] in {"TECHX", "BLENDX"} for p in body["plans"] for m in p["moves"])
+
+
+def test_held_funds_off_the_allowlist_still_count(client, allow):
+    add_fund("TECHX", {"Information Technology": 100})
+    add_fund("HLTHX", {"Health Care": 100})
+    allow()  # nothing may be suggested
+    body = client.post("/plan", json={
+        "holdings": [{"ticker": "TECHX", "amount": 8000}, {"ticker": "HLTHX", "amount": 2000}],
+        "target": {"Technology": 50, "Health Care": 50},
+    }).json()
+    assert mix(body["current"]) == {"Technology": 0.8, "Health Care": 0.2}
+    [plan] = body["plans"]
+    assert plan["kind"] == "rearrange" and plan["new_funds"] == []
+    assert [(m["ticker"], m["action"], m["amount"]) for m in plan["moves"]] == [
+        ("TECHX", "reduce", 3000), ("HLTHX", "increase", 3000)]

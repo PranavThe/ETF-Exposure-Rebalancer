@@ -1,4 +1,4 @@
-"""Reference data we maintain: data/reference/funds.csv and sectors.csv."""
+"""Reference data we maintain: data/reference/funds.csv, sectors.csv and name_sectors.csv."""
 
 import csv
 from pathlib import Path
@@ -34,6 +34,17 @@ def read_sectors(*, include_samples: bool = False) -> dict[str, str]:
             raise ValueError(f"sectors.csv lists {r['security_id']} more than once")
         sectors[r["security_id"]] = r["sector"]
     return sectors
+
+
+def read_name_sectors() -> dict[str, str]:
+    """Normalized company name -> sector, from name_sectors.csv (scripts/build_name_sectors.py).
+
+    Read-only reference for the planner; never loaded into the database. Empty if the file is missing.
+    """
+    if not (REFERENCE_DIR / "name_sectors.csv").exists():
+        return {}
+    return {r["normalized_name"]: r["sector"] for r in _read("name_sectors.csv")
+            if r["normalized_name"] and r["sector"]}
 
 
 def sync_reference(session: Session, *, include_samples: bool = False) -> None:

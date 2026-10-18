@@ -65,6 +65,29 @@ SHORTLIST_SIZE = 12  # candidate new ETFs considered per plan
 MIN_POSITION = 0.01  # positions below 1% of the portfolio are dropped rather than suggested
 MIN_GAIN = 0.005  # a new ETF must bring the plan at least 0.5 pp closer to the target
 
+# The only ETFs a plan may propose adding: plain, liquid, non-leveraged index ETFs a beginner would
+# recognise (broad U.S. market, size and style, dividend, international, the sector families from
+# SPDR, Vanguard and iShares, core bonds and T-bills). Users can hold any ETF; this list only limits
+# what plans suggest. The API reads it through `routes.plans.suggestable_etfs`, which tests override.
+SUGGESTABLE_ETFS = frozenset({
+    # Broad U.S. market, size and style
+    "VTI", "VOO", "IVV", "SPY", "ITOT", "SCHB", "QQQ", "RSP", "IWM", "IJH", "IJR", "VB", "VO",
+    "VUG", "VTV",
+    # Dividend
+    "SCHD", "DGRO",
+    # International
+    "VEA", "VXUS", "IEFA", "EFA", "VWO", "IEMG", "ACWI",
+    # Sectors: SPDR, Vanguard, iShares
+    "XLK", "XLV", "XLF", "XLY", "XLP", "XLC", "XLI", "XLE", "XLU", "XLB", "XLRE",
+    "VGT", "VHT", "VFH", "VCR", "VDC", "VOX", "VIS", "VDE", "VPU", "VAW", "VNQ",
+    "IYW", "IYH", "IYF", "IYC", "IYK", "IYZ", "IYJ", "IYE", "IDU", "IYM", "IYR",
+    # Bonds and T-bills
+    "BND", "AGG", "SGOV",
+})
+# A fund is suggested only when at least this share of its mix has a known sector (or is
+# Cash & other), so a plan never leans on a fund whose holdings we could not classify.
+MIN_CLASSIFIED = 0.8
+
 
 def canonical_sector(name: str | None) -> str:
     key = (name or "").strip().lower()
@@ -92,6 +115,18 @@ def fund_sector_weights(rows: Iterable[Mapping]) -> dict[str, float]:
         totals[sector] = totals.get(sector, 0.0) + value
     grand = math.fsum(totals.values())
     return {s: v / grand for s, v in totals.items()} if grand > 0 else {}
+
+
+def classified_share(mix: Mapping[str, float]) -> float:
+    """Share of a fund's mix with a known sector, Cash & other included."""
+    return math.fsum(w for s, w in mix.items() if s != UNCLASSIFIED)
+
+
+def suggestable(weights: Mapping[str, Mapping[str, float]], allowed: Iterable[str]) -> set[str]:
+    """Funds a plan may add: on the allowlist, with at least MIN_CLASSIFIED of their mix classified."""
+    allowed = set(allowed)
+    return {t for t, mix in weights.items()
+            if t in allowed and mix and classified_share(mix) >= MIN_CLASSIFIED}
 
 
 def exposure(amounts: Mapping[str, float], weights: Mapping[str, Mapping[str, float]]) -> dict[str, float]:
