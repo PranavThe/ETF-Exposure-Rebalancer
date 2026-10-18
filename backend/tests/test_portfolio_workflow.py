@@ -144,6 +144,38 @@ def test_tickerinside_and_alpaca_flow_reaches_portfolio_and_changes_api(client):
                                          "weight": 0.6, "change": pytest.approx(0.1)}]
 
 
+def test_on_demand_tickerinside_sync_saves_once_and_reports_coverage(client, monkeypatch):
+    from backend.app.routes import provider_data
+    from backend.pipeline.tickerinside import ProviderNotCovered
+
+    calls = []
+    monkeypatch.setattr(provider_data, "fetch_fund", lambda ticker, timeout: calls.append(ticker) or {
+        "ticker": ticker, "name": "Demo ETF", "as_of_date": date(2026, 10, 16),
+        "source_layer": "issuer", "source_url": "https://example.test/demo",
+        "cite_as": "TickerInside", "content_hash": "d" * 64,
+        "holdings": {"AAA": 0.7, "BBB": 0.3},
+    })
+
+    fetched = client.post("/provider-data/funds/DEMO/sync")
+    assert fetched.status_code == 200
+    assert fetched.json() == {"fund": "DEMO", "status": "fetched",
+                              "as_of_date": "2026-10-16", "holdings_count": 2}
+    existing = client.post("/provider-data/funds/DEMO/sync")
+    assert existing.status_code == 200
+    assert existing.json()["status"] == "already_available"
+    assert existing.json()["holdings_count"] == 2
+    assert calls == ["DEMO"]
+
+    def not_covered(ticker, timeout):
+        raise ProviderNotCovered(f"no record for {ticker}")
+
+    monkeypatch.setattr(provider_data, "fetch_fund", not_covered)
+    missing = client.post("/provider-data/funds/FLOWTEST/sync")
+    assert missing.status_code == 200
+    assert missing.json() == {"fund": "FLOWTEST", "status": "not_covered",
+                              "fallback_available": True}
+
+
 def test_market_data_plan_only_does_not_save_provider_data(client, monkeypatch, capsys):
     from datetime import date
 
