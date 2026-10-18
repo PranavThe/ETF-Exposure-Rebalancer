@@ -97,7 +97,7 @@ export default function HoldingsSection({
   const total = holdings.reduce((a, h) => a + h.amount, 0);
 
   return (
-    <section className="flex flex-col lg:min-h-0">
+    <section className="flex flex-col xl:min-h-0 xl:flex-1">
       <div className="shrink-0 px-6 pb-4 pt-5">
         <h2 className="text-[15px] font-medium text-fg">Holdings</h2>
         <p className="mt-3 font-mono text-[28px] leading-none text-fg">
@@ -112,7 +112,7 @@ export default function HoldingsSection({
         <EtfSearch covered={covered} held={new Set(holdings.map((h) => h.ticker))} onPick={onAdd} focusKey={0} />
       </div>
 
-      <div className="lg:min-h-0 lg:flex-1 lg:overflow-auto">
+      <div className="xl:min-h-0 xl:flex-1 xl:overflow-auto">
         {holdings.length === 0 ? (
           <div className="px-6 py-6">
             <div className="flex items-center gap-2 text-[12px] text-faint">

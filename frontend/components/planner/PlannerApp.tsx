@@ -320,7 +320,7 @@ export default function PlannerApp() {
   const held = useMemo(() => new Set(holdings.map((h) => h.ticker)), [holdings]);
 
   return (
-    <div className="flex h-dvh flex-col bg-canvas">
+    <div className="mx-auto flex h-dvh w-full max-w-[1920px] flex-col bg-canvas min-[1922px]:border-x min-[1922px]:border-line">
       <TopBar
         covered={covered}
         held={held}
@@ -332,50 +332,58 @@ export default function PlannerApp() {
         onShare={copyLink}
         onReset={holdings.length > 0 || saved ? startOver : null}
       />
-      <main className="min-h-0 flex-1 overflow-auto lg:grid lg:grid-cols-[288px_minmax(0,1fr)_360px] lg:divide-x lg:divide-line lg:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_420px]">
-        <HoldingsSection
-          holdings={holdings}
-          funds={funds}
-          covered={covered}
-          flash={flash}
-          providerData={providerData}
-          prices={prices}
-          onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
-          onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
-          onAdd={addEtf}
-          onExample={loadExample}
-          onFocusSearch={() => setFocusKey((k) => k + 1)}
-        />
-        <div className="flex flex-col divide-y divide-line border-y border-line lg:min-h-0 lg:border-y-0">
-          <div className="flex flex-col lg:min-h-0 lg:flex-[3]">
-            <MixSection
-              current={current}
-              target={target}
-              match={match}
-              matchAfter={best ? 1 - best.distance : null}
-              funds={result?.funds ?? []}
-              hasHoldings={hasHoldings}
-              onSector={moveSlider}
-              onReset={resetTarget}
+      {/* Phones: one column. 768-1279px: holdings and Scythe on the left, mix and moves on the right.
+          From 1280px: three columns that fill the window, scrolling as a page when it is too short. */}
+      <main className="min-h-0 flex-1 overflow-auto">
+        <div className="grid grid-cols-1 [grid-template-areas:'holdings'_'main'_'scythe'] md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] md:grid-rows-[auto_1fr] md:[grid-template-areas:'holdings_main'_'scythe_main'] xl:h-full xl:min-h-[680px] xl:grid-cols-[272px_minmax(0,1fr)_336px] xl:grid-rows-1 xl:[grid-template-areas:'holdings_main_scythe'] 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
+          <div className="border-b border-line [grid-area:holdings] md:border-r xl:flex xl:min-h-0 xl:flex-col xl:border-b-0">
+            <HoldingsSection
+              holdings={holdings}
+              funds={funds}
+              covered={covered}
+              flash={flash}
+              providerData={providerData}
+              prices={prices}
+              onAmount={(ticker, v) => edit(setHoldings)(holdings.map((h) => (h.ticker === ticker ? { ...h, amount: v } : h)))}
+              onRemove={(ticker) => edit(setHoldings)(holdings.filter((h) => h.ticker !== ticker))}
+              onAdd={addEtf}
+              onExample={loadExample}
+              onFocusSearch={() => setFocusKey((k) => k + 1)}
             />
           </div>
-          <div className="flex flex-col lg:min-h-0 lg:flex-[2]">
-            <MovesSection
-              plans={plans}
-              active={activePlan}
-              onActive={setActivePlan}
-              hasTarget={target !== null}
-              hasHoldings={hasHoldings}
-              loading={planning}
-              error={planError}
-              maxNew={maxNew}
-              onMaxNew={setMaxNew}
-              onApply={applyPlan}
-            />
+          <div className="flex min-w-0 flex-col divide-y divide-line border-b border-line [grid-area:main] md:border-b-0 xl:min-h-0">
+            <div className="flex flex-col xl:min-h-0 xl:flex-[3]">
+              <MixSection
+                current={current}
+                target={target}
+                match={match}
+                matchAfter={best ? 1 - best.distance : null}
+                funds={result?.funds ?? []}
+                hasHoldings={hasHoldings}
+                onSector={moveSlider}
+                onReset={resetTarget}
+              />
+            </div>
+            <div className="flex flex-col xl:min-h-0 xl:flex-[2]">
+              <MovesSection
+                plans={plans}
+                active={activePlan}
+                onActive={setActivePlan}
+                hasTarget={target !== null}
+                hasHoldings={hasHoldings}
+                loading={planning}
+                error={planError}
+                maxNew={maxNew}
+                onMaxNew={setMaxNew}
+                onApply={applyPlan}
+              />
+            </div>
+          </div>
+          <div className="border-line [grid-area:scythe] md:border-r xl:flex xl:min-h-0 xl:flex-col xl:border-r-0 xl:border-l">
+            {/* Scythe waits until the mix is loaded, so it reads your real mix rather than an empty one. */}
+            <ScytheSection turns={turns} busy={chatBusy} waiting={holdings.length > 0 && !result} onSend={sendChat} connected={connected} />
           </div>
         </div>
-        {/* Scythe waits until the mix is loaded, so it reads your real mix rather than an empty one. */}
-        <ScytheSection turns={turns} busy={chatBusy} waiting={holdings.length > 0 && !result} onSend={sendChat} connected={connected} />
       </main>
       <StatusBar />
       <Toasts toasts={toasts} />

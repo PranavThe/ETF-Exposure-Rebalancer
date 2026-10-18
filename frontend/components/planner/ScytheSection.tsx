@@ -46,7 +46,7 @@ export default function ScytheSection({
   }
 
   return (
-    <section className="flex h-[560px] min-h-0 flex-col lg:h-auto">
+    <section className="flex h-[560px] min-h-0 flex-col xl:h-auto xl:flex-1">
       <div className="flex shrink-0 items-center gap-3 px-6 pb-4 pt-5">
         <ScytheMark size={20} />
         <div className="min-w-0">

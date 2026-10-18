@@ -54,8 +54,8 @@ function Donut({ current, target, hover, onHover, match }: { current: Mix; targe
   const now = hover ? current[hover] ?? 0 : 0;
   const want = hover && target ? target[hover] ?? 0 : null;
   return (
-    <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Sector mix: inner ring now, outer ring your target">
+    <div className="relative aspect-square w-[176px] shrink-0 @[60rem]:w-[216px]">
+      <svg width="100%" height="100%" viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Sector mix: inner ring now, outer ring your target">
         {empty ? (
           <>
             <circle cx={C} cy={C} r={96} fill="none" stroke="var(--color-panel-3)" strokeWidth={8} opacity={0.6} />
@@ -127,7 +127,7 @@ export default function MixSection({
   const hidden = SECTORS.length - rows.length;
 
   return (
-    <section className="flex flex-1 flex-col lg:min-h-0">
+    <section className="flex flex-1 flex-col xl:min-h-0">
       <SectionHeader
         title="Your sector mix"
         sub={
@@ -157,23 +157,23 @@ export default function MixSection({
         }
       />
 
-      <div className="px-6 pb-5 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+      <div className="@container px-6 pb-5 xl:min-h-0 xl:flex-1 xl:overflow-auto">
         {view === "sectors" ? (
-          <div className="flex flex-col items-center gap-6 xl:flex-row xl:items-start xl:gap-10">
-            <div className="flex shrink-0 flex-col items-center gap-4 xl:pt-1">
+          <div className="flex flex-col items-center gap-6 @[36rem]:flex-row @[36rem]:items-start @[36rem]:gap-7 @[60rem]:gap-12">
+            <div className="flex shrink-0 flex-col items-center gap-4 @[36rem]:pt-1">
               <Donut current={current} target={target} hover={hover} onHover={setHover} match={match} />
               {match !== null && matchAfter !== null && matchAfter > match + 0.0005 && (
                 <p className="font-mono text-[13px] text-up">→ {pct(matchAfter)} after the best moves</p>
               )}
             </div>
 
-            <div className="w-full min-w-0 flex-1">
-              <div className="grid grid-cols-[minmax(84px,120px)_minmax(60px,1fr)_46px_46px] gap-3 border-b sm:grid-cols-[minmax(100px,150px)_minmax(90px,1fr)_50px_50px_62px] border-line pb-2 text-[11.5px] text-faint">
+            <div className="@container/table w-full min-w-0 max-w-[880px] flex-1">
+              <div className="grid grid-cols-[minmax(80px,120px)_minmax(80px,1fr)_46px] gap-2.5 border-b @[18rem]/table:grid-cols-[minmax(84px,120px)_minmax(60px,1fr)_46px_46px] @[25rem]/table:grid-cols-[minmax(90px,150px)_minmax(70px,1fr)_48px_48px_60px] border-line pb-2 text-[11.5px] text-faint">
                 <span>Sector</span>
                 <span>{target ? "Now → target" : "Drag to set a target"}</span>
-                <span className="text-right">Now</span>
+                <span className="hidden text-right @[18rem]/table:block">Now</span>
                 <span className="text-right">Target</span>
-                <span className="hidden text-right sm:block">Change</span>
+                <span className="hidden text-right @[25rem]/table:block">Change</span>
               </div>
               <ul>
                 {rows.map((sector) => {
@@ -188,7 +188,7 @@ export default function MixSection({
                       key={sector}
                       onMouseEnter={() => setHover(sector)}
                       onMouseLeave={() => setHover(null)}
-                      className={`grid grid-cols-[minmax(84px,120px)_minmax(60px,1fr)_46px_46px] items-center gap-3 sm:grid-cols-[minmax(100px,150px)_minmax(90px,1fr)_50px_50px_62px] border-b border-line/50 py-2 text-[13.5px] transition-colors ${lit ? "bg-panel/60" : ""}`}
+                      className={`grid grid-cols-[minmax(80px,120px)_minmax(80px,1fr)_46px] items-center gap-2.5 @[18rem]/table:grid-cols-[minmax(84px,120px)_minmax(60px,1fr)_46px_46px] @[25rem]/table:grid-cols-[minmax(90px,150px)_minmax(70px,1fr)_48px_48px_60px] border-b border-line/50 py-2 text-[13.5px] transition-colors ${lit ? "bg-panel/60" : ""}`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: sectorColor(sector) }} />
@@ -221,9 +221,9 @@ export default function MixSection({
                           className={`target-range absolute inset-0 w-full ${target ? "" : "target-idle"}`}
                         />
                       </span>
-                      <span className="text-right font-mono tabular-nums text-muted">{hasHoldings ? pct(now) : "–"}</span>
+                      <span className="hidden text-right font-mono tabular-nums text-muted @[18rem]/table:block">{hasHoldings ? pct(now) : "–"}</span>
                       <span className={`text-right font-mono tabular-nums ${target ? "text-fg" : "text-faint"}`}>{target || hasHoldings ? pct(want) : "–"}</span>
-                      <span className="hidden text-right font-mono text-[12.5px] tabular-nums sm:block">{target && hasHoldings ? <Delta value={want - now} /> : <span className="text-faint">—</span>}</span>
+                      <span className="hidden text-right font-mono text-[12.5px] tabular-nums @[25rem]/table:block">{target && hasHoldings ? <Delta value={want - now} /> : <span className="text-faint">—</span>}</span>
                     </li>
                   );
                 })}

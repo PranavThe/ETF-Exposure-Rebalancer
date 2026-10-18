@@ -46,13 +46,13 @@ export default function MovesSection({
   const plan = plans[Math.min(active, plans.length - 1)];
 
   return (
-    <section className="flex flex-1 flex-col lg:min-h-0">
+    <section className="flex flex-1 flex-col xl:min-h-0">
       <SectionHeader
         title="Suggested moves"
         sub={plan ? plan.summary : hasTarget ? (loading ? "Working out the moves…" : "") : "Set your target and the moves to reach it appear here."}
         right={
           <>
-            <span className="hidden items-center gap-2 text-[12.5px] text-muted sm:flex">
+            <span className="flex items-center gap-2 whitespace-nowrap text-[12.5px] text-muted">
               New ETFs up to
               <Stepper value={maxNew} min={0} max={3} onChange={onMaxNew} label="New ETFs allowed" />
             </span>
@@ -80,7 +80,7 @@ export default function MovesSection({
         </div>
       )}
 
-      <div className="overflow-x-auto px-6 pb-4 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+      <div className="@container overflow-x-auto px-6 pb-4 xl:min-h-0 xl:flex-1 xl:overflow-auto">
         {error ? (
           <p className="py-6 text-sm text-down">{error}</p>
         ) : !hasTarget || !hasHoldings ? (
@@ -103,14 +103,14 @@ export default function MovesSection({
             <p className="py-8 text-[13px] text-muted">You’re as close as these ETFs allow. Allow new ETFs above to get closer.</p>
           )
         ) : (
-          <table className="w-full text-[13.5px]">
+          <table className="w-full max-w-[1100px] text-[13.5px]">
             <thead>
               <tr className="text-left text-[11.5px] text-faint">
                 <th className="py-2.5 font-normal">Move</th>
                 <th className="py-2.5 font-normal">ETF</th>
-                <th className="hidden py-2.5 text-right font-normal sm:table-cell">Now</th>
-                <th className="hidden py-2.5 text-right font-normal sm:table-cell">After</th>
-                <th className="py-2.5 text-right font-normal">Change</th>
+                <th className="hidden py-2.5 pl-4 text-right font-normal @[34rem]:table-cell">Now</th>
+                <th className="hidden py-2.5 pl-4 text-right font-normal @[34rem]:table-cell">After</th>
+                <th className="py-2.5 pl-4 text-right font-normal">Change</th>
               </tr>
             </thead>
             <tbody>
@@ -124,13 +124,13 @@ export default function MovesSection({
                         {logo(m.ticker, m.name)}
                         <span className="min-w-0">
                           <span className="block font-mono font-semibold text-fg">{m.ticker}</span>
-                          <span className="block max-w-[240px] truncate text-[11.5px] text-faint">{m.name}</span>
+                          <span className="block max-w-[260px] truncate text-[11.5px] text-faint">{m.name}</span>
                         </span>
                       </span>
                     </td>
-                    <td className="hidden py-3 text-right font-mono tabular-nums text-muted sm:table-cell">{usd(m.before)}</td>
-                    <td className="hidden py-3 text-right font-mono tabular-nums text-fg sm:table-cell">{usd(m.after)}</td>
-                    <td className={`py-3 text-right font-mono tabular-nums ${up ? "text-up" : "text-down"}`}>
+                    <td className="hidden whitespace-nowrap py-3 pl-4 text-right font-mono tabular-nums text-muted @[34rem]:table-cell">{usd(m.before)}</td>
+                    <td className="hidden whitespace-nowrap py-3 pl-4 text-right font-mono tabular-nums text-fg @[34rem]:table-cell">{usd(m.after)}</td>
+                    <td className={`whitespace-nowrap py-3 pl-4 text-right font-mono tabular-nums ${up ? "text-up" : "text-down"}`}>
                       {up ? "+" : "−"}
                       {usd(m.amount)}
                     </td>

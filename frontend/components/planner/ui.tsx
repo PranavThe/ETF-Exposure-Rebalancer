@@ -109,7 +109,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
 /** Underlined text tabs for section headers (no boxes). */
 export function TextTabs({ tabs, active, onTab, label }: { tabs: Tab[]; active: string; onTab: (id: string) => void; label: string }) {
   return (
-    <div role="tablist" aria-label={label} className="flex items-center gap-5">
+    <div role="tablist" aria-label={label} className="-mb-px flex items-center gap-5 overflow-x-auto [scrollbar-width:none]">
       {tabs.map((t) => {
         const on = t.id === active;
         return (
@@ -119,7 +119,7 @@ export function TextTabs({ tabs, active, onTab, label }: { tabs: Tab[]; active: 
             role="tab"
             aria-selected={on}
             onClick={() => onTab(t.id)}
-            className={`relative flex items-center gap-1.5 pb-1.5 text-[14px] transition-colors ${on ? "text-fg" : "text-faint hover:text-muted"}`}
+            className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap pb-1.5 text-[14px] transition-colors ${on ? "text-fg" : "text-faint hover:text-muted"}`}
           >
             {t.label}
             {t.badge !== undefined && <span className={`font-mono text-[12px] ${on ? "text-up" : "text-faint"}`}>{t.badge}</span>}
@@ -137,12 +137,12 @@ export function TextTabs({ tabs, active, onTab, label }: { tabs: Tab[]; active: 
 /** A section title row: title on the left, controls on the right. */
 export function SectionHeader({ title, sub, right }: { title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex min-h-[52px] shrink-0 items-center gap-3 px-6 pt-5 pb-3">
-      <div className="min-w-0">
+    <div className="flex min-h-[52px] shrink-0 flex-wrap items-center gap-x-4 gap-y-3 px-6 pt-5 pb-3">
+      <div className="min-w-0 flex-1 basis-[14rem]">
         <h2 className="text-[15px] font-medium text-fg">{title}</h2>
         {sub && <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-muted">{sub}</p>}
       </div>
-      {right && <div className="ml-auto flex shrink-0 items-center gap-3">{right}</div>}
+      {right && <div className="ml-auto flex flex-wrap items-center justify-end gap-3">{right}</div>}
     </div>
   );
 }
